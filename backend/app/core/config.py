@@ -116,6 +116,14 @@ class Settings:
         )
         self.async_max_workers = int(os.getenv("ASYNC_MAX_WORKERS", "2"))
         self.job_poll_interval_s = float(os.getenv("JOB_POLL_INTERVAL_S", "1"))
+        # Queue backend: "thread" (dev/tests) or "celery" (Redis broker).
+        self.task_backend = os.getenv("TASK_BACKEND", "thread")  # thread | celery
+        self.redis_url = os.getenv("REDIS_URL", "")
+        self.celery_eager = os.getenv("CELERY_EAGER", "false").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
 
     @property
     def is_sqlite(self) -> bool:

@@ -20,6 +20,10 @@ def _is_async() -> bool:
     return os.getenv("EXEC_ASYNC", "false").lower() in ("1", "true", "yes")
 
 
+def _is_celery() -> bool:
+    return os.getenv("TASK_BACKEND", "thread") == "celery"
+
+
 def _pool() -> ThreadPoolExecutor:
     global _executor
     if _executor is None:
@@ -33,7 +37,19 @@ def _pool() -> ThreadPoolExecutor:
 
 
 def run_job(job_id: int, task_fn: Callable[[SessionLocal, Job], None]) -> None:
-    """Enqueue (async) or execute immediately (inline) a job by id."""
+    """Dispatch a job: Celery (Redis) when configured, else local thread/inline."""
+    if _is_celery():
+        from app.workers import celery_tasks  # noqa: F401  (register task names)
+        from app.workers.celery_app import celery_app
+
+        name = f"jobs.{task_fn.__name__}"
+        eager = os.getenv("CELERY_EAGER", "false").lower() in ("1", "true", "yes")
+        if eager:
+            # send_task ignores task_always_eager; invoke the registered task.
+            celery_app.tasks[name](job_id)
+        else:
+            celery_app.send_task(name, args=[job_id])
+        return
     if _is_async():
         _pool().submit(_work, job_id, task_fn)
     else:
