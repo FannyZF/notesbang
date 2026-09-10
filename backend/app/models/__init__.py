@@ -116,6 +116,7 @@ class Project(Base):
     speed_source: Mapped[str] = mapped_column(String(16), default="default")
     speed_cps: Mapped[float | None] = mapped_column(Float, nullable=True)
     quality_mode: Mapped[str] = mapped_column(String(16), default="full")  # full | fast
+    vision_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     style_profile_id: Mapped[int | None] = mapped_column(
         ForeignKey("style_profiles.id"), nullable=True
     )

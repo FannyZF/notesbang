@@ -107,6 +107,7 @@ class PageOut(BaseModel):
     weight: float
     status: str
     version: int
+    image_key: str | None = None
 
 
 class PageSummary(BaseModel):
@@ -157,6 +158,7 @@ class ProjectOut(BaseModel):
     speed_source: str | None = "default"
     speed_cps: float | None = None
     quality_mode: str | None = "full"
+    vision_enabled: bool | None = True
     running: bool = False
     style_profile_id: int | None = None
     pages: list[PageOut] = []
@@ -176,6 +178,7 @@ class ProjectOut(BaseModel):
             "data_fidelity": True,
             "speed_source": "default",
             "quality_mode": "full",
+            "vision_enabled": True,
         }
         for field_name, value in defaults.items():
             if getattr(self, field_name) is None:
@@ -211,6 +214,7 @@ class GenerationSettingsIn(BaseModel):
     speed_source: str | None = None  # default | manual | recording
     speed_cps: float | None = Field(default=None, gt=0, le=20)
     quality_mode: str | None = None  # full | fast
+    vision_enabled: bool | None = None
     style_profile_id: int | None = None
 
 

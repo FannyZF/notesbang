@@ -220,6 +220,10 @@ def generate(
     # ---- Phase 1: draft ----
     trace = StoryTrace()
     prev = ""
+    vision_used = 0
+    from app.services.storage import get_storage
+
+    storage = get_storage()
     for i, page in enumerate(pages):
         target = targets[i]
         if page.id not in target_ids:
@@ -256,8 +260,24 @@ def generate(
             takeaway=takeaways.get(page.ord, ""),
             page_text=page.raw_text,
         )
+        images: list[bytes] | None = None
+        use_vision = (
+            settings.vision_enabled
+            and (project.vision_enabled is not False)
+            and page.image_key
+            and (page.weight or 1.0) >= 1.5
+            and vision_used < settings.vision_max_pages
+        )
+        if use_vision and page.image_key:
+            try:
+                images = [storage.read_bytes(page.image_key)]
+                vision_used += 1
+            except Exception:  # noqa: BLE001
+                images = None
         try:
-            result = provider.chat(system, user_ctx, vision=False)
+            result = provider.chat(
+                system, user_ctx, vision=bool(images), images=images
+            )
         except LLMError as exc:
             raise GenerationError(str(exc)) from exc
         note = fit_notes(result.text.strip(), target, settings.char_tolerance)

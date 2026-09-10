@@ -19,6 +19,7 @@ type Page = {
   status: string;
   version: number;
   weight: number;
+  image_key?: string | null;
 };
 type Project = {
   id: number;
@@ -32,6 +33,7 @@ type Project = {
   custom_scenario: string;
   output_lang: string;
   quality_mode: string;
+  vision_enabled?: boolean;
   style_profile_id: number | null;
   running?: boolean;
 };
@@ -85,6 +87,7 @@ export default function Home() {
   const [summaries, setSummaries] = useState<Record<number, SummaryData>>({});
   const [revs, setRevs] = useState<Record<string, PageRevision[]>>({});
   const [structures, setStructures] = useState<Record<number, StructureSection[]>>({});
+  const [images, setImages] = useState<Record<number, string>>({});
   const [plans, setPlans] = useState<Record<number, Plan>>({});
   const [generatingPid, setGeneratingPid] = useState<number | null>(null);
   const [progress, setProgress] = useState<Record<number, number>>({});
@@ -465,6 +468,20 @@ export default function Home() {
       setNoticeOk("Suggested sections — rename or move slides, then Save arrangement.");
     } catch (err) {
       setNotice({ kind: "err", text: errMessage(err) });
+    }
+  };
+
+  const loadPageImage = async (pid: number, pageId: number) => {
+    if (images[pageId]) return;
+    try {
+      const res = await fetch(`${API_BASE}/projects/${pid}/pages/${pageId}/image`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      setImages((prev) => ({ ...prev, [pageId]: URL.createObjectURL(blob) }));
+    } catch {
+      /* image optional */
     }
   };
 
@@ -1154,6 +1171,8 @@ export default function Home() {
                 phase={phaseByPid[selected.id] ?? ""}
                 profiles={profiles}
                 revs={revs}
+                images={images}
+                onLoadImage={(pageId) => loadPageImage(selected.id, pageId)}
                 sections={structures[selected.id] ?? null}
                 onLoadStructure={() => loadStructure(selected.id)}
                 onSuggestStructure={() => suggestStructure(selected.id)}
@@ -1547,6 +1566,8 @@ function ProjectDetail({
   phase,
   profiles,
   revs,
+  images,
+  onLoadImage,
   sections,
   onLoadStructure,
   onSuggestStructure,
@@ -1573,6 +1594,8 @@ function ProjectDetail({
   phase: string;
   profiles: StyleProfile[];
   revs: Record<string, PageRevision[]>;
+  images: Record<number, string>;
+  onLoadImage: (pageId: number) => void;
   sections: StructureSection[] | null;
   onLoadStructure: () => void;
   onSuggestStructure: () => void;
@@ -1595,6 +1618,7 @@ function ProjectDetail({
   const [style, setStyle] = useState(project.style ?? "business");
   const [mode, setMode] = useState(project.note_mode ?? "script");
   const [quality, setQuality] = useState(project.quality_mode ?? "full");
+  const [vision, setVision] = useState(project.vision_enabled ?? true);
   const [pace, setPace] = useState("default");
   const [manualCps, setManualCps] = useState("");
   const [scenario, setScenario] = useState(project.custom_scenario ?? "");
@@ -1608,6 +1632,7 @@ function ProjectDetail({
       target_minutes: minutes,
       note_mode: mode,
       quality_mode: quality,
+      vision_enabled: vision,
       style,
       style_profile_id: styleProfId,
       custom_scenario: scenario,
@@ -1778,6 +1803,14 @@ function ProjectDetail({
               <option value="full">Full review (best)</option>
               <option value="fast">Fast (draft only)</option>
             </select>
+          </label>
+          <label className="flex items-center gap-2 text-zinc-600">
+            <input
+              type="checkbox"
+              checked={vision}
+              onChange={(e) => setVision(e.target.checked)}
+            />
+            Analyze slide images (vision)
           </label>
           <label>
             Pace
@@ -1990,10 +2023,23 @@ function ProjectDetail({
                 onChange={(e) => setDrafts((prev) => ({ ...prev, [page.id]: e.target.value }))}
               />
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <details>
+                <details
+                  onToggle={(e) => {
+                    if ((e.target as HTMLDetailsElement).open && page.image_key) {
+                      onLoadImage(page.id);
+                    }
+                  }}
+                >
                   <summary className="cursor-pointer select-none text-xs text-zinc-400 transition hover:text-zinc-600">
-                    View original slide text
+                    View original slide (text &amp; image)
                   </summary>
+                  {images[page.id] && (
+                    <img
+                      src={images[page.id]}
+                      alt={`Slide ${page.ord}`}
+                      className="mt-1 w-full rounded-xl border border-zinc-200"
+                    />
+                  )}
                   <pre className="mt-1 max-h-44 overflow-auto whitespace-pre-wrap rounded-xl border border-zinc-200 bg-zinc-50/70 p-3 text-xs leading-relaxed text-zinc-500">
                     {page.raw_text || "(no extractable text)"}
                   </pre>

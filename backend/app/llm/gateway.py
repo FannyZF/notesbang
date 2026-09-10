@@ -7,6 +7,7 @@ the pipeline talks only to the abstract interface, so extra providers (PRD
 """
 from __future__ import annotations
 
+import base64
 import json
 from dataclasses import dataclass
 from typing import Any
@@ -39,6 +40,7 @@ class Provider:
         *,
         json_mode: bool = False,
         vision: bool = False,
+        images: list[bytes] | None = None,
     ) -> LLMResult:
         raise NotImplementedError
 
@@ -74,6 +76,7 @@ class MockProvider(Provider):
         *,
         json_mode: bool = False,
         vision: bool = False,
+        images: list[bytes] | None = None,
     ) -> LLMResult:
         if json_mode:
             text = json.dumps({"ok": False, "reason": "mock has no JSON content"}, ensure_ascii=False)
@@ -98,15 +101,29 @@ class DeepSeekProvider(Provider):
         *,
         json_mode: bool = False,
         vision: bool = False,
+        images: list[bytes] | None = None,
     ) -> LLMResult:
         if not self.api_key:
             raise LLMError("DEEPSEEK_API_KEY not configured")
         model = self.vision_model if vision else self.model
+        if images:
+            content: Any = [{"type": "text", "text": user}]
+            for img in images:
+                b64 = base64.b64encode(img).decode("ascii")
+                content.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{b64}"},
+                    }
+                )
+            user_content: Any = content
+        else:
+            user_content = user
         payload: dict[str, Any] = {
             "model": model,
             "messages": [
                 {"role": "system", "content": system},
-                {"role": "user", "content": user},
+                {"role": "user", "content": user_content},
             ],
             "temperature": 0.7,
             "stream": False,

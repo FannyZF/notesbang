@@ -95,6 +95,7 @@ def ensure_schema() -> None:
             "data_fidelity": 1,
             "speed_source": "default",
             "quality_mode": "full",
+            "vision_enabled": 1,
         },
         "pages": {"note_mode": "script", "status": "parsed", "weight": 1.0},
         "jobs": {"phase": ""},

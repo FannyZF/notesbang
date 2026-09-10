@@ -80,6 +80,19 @@ class Settings:
             "true",
             "yes",
         )
+        # Slide rendering + multimodal vision.
+        self.render_slides = os.getenv("RENDER_SLIDES", "false").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        self.soffice_path = os.getenv("SOFFICE_PATH", "")
+        self.vision_enabled = os.getenv("VISION_ENABLED", "true").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        self.vision_max_pages = int(os.getenv("VISION_MAX_PAGES", "20"))
         self.export_enabled = os.getenv("EXPORT_ENABLED", "false").lower() in (
             "1",
             "true",

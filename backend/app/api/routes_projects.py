@@ -126,15 +126,32 @@ async def upload_project(
             headers={"X-Error-Code": "PARSE_FAILED"},
         ) from exc
 
+    created_pages: list[Page] = []
     for p in pages:
-        db.add(
-            Page(
-                project_id=project.id,
-                ord=p.ord,
-                raw_text=p.text,
-                status="parsed",
-            )
+        page = Page(
+            project_id=project.id,
+            ord=p.ord,
+            raw_text=p.text,
+            status="parsed",
         )
+        db.add(page)
+        created_pages.append(page)
+    db.flush()
+
+    # Optional: render slide images (thumbnails + vision). Best-effort.
+    if settings.render_slides:
+        try:
+            from app.rendering.slides import render_pages
+
+            with storage.materialize(source_key) as src:
+                images = render_pages(src)
+            for page, png in zip(created_pages, images):
+                key = f"{user.id}/{project.id}/pages/{page.ord}.png"
+                storage.save_bytes(key, png)
+                page.image_key = key
+        except Exception:  # noqa: BLE001 - rendering must not break upload
+            pass
+
     project.status = "parsed"
     job.status = "succeeded"
     job.progress = 100
@@ -708,6 +725,25 @@ def _raise_job_failure(job: Job) -> None:
         detail=err,
         headers={"X-Error-Code": code},
     )
+
+
+@router.get("/{project_id}/pages/{page_id}/image")
+def get_page_image(
+    project_id: int,
+    page_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = _owned_project(db, project_id, user)
+    page = (
+        db.query(Page)
+        .filter(Page.id == page_id, Page.project_id == project.id)
+        .first()
+    )
+    if page is None or not page.image_key:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No slide image")
+    data = get_storage().read_bytes(page.image_key)
+    return Response(content=data, media_type="image/png")
 
 
 @router.put("/{project_id}/pages/{page_id}", response_model=PageOut)
