@@ -56,7 +56,7 @@ const DEFAULT_PACKS: Pack[] = [
   { points: 200, usd: 95.0, label: "Popular", unit_price: 0.475 },
   { points: 500, usd: 230.0, label: "Frequent presenter", unit_price: 0.46 },
 ];
-type Me = { email: string; email_verified: boolean; plan_state: string };
+type Me = { email: string; email_verified: boolean; plan_state: string; notify_on_complete?: boolean };
 
 const STYLE_OPTIONS: { value: string; label: string }[] = [
   { value: "business", label: "Business" },
@@ -83,6 +83,7 @@ export default function Home() {
   const [pricingOpen, setPricingOpen] = useState(false);
   const [pwdCur, setPwdCur] = useState("");
   const [pwdNew, setPwdNew] = useState("");
+  const [notifyPref, setNotifyPref] = useState(true);
   const [pricing, setPricing] = useState<Pricing | null>(null);
   const [summaries, setSummaries] = useState<Record<number, SummaryData>>({});
   const [revs, setRevs] = useState<Record<string, PageRevision[]>>({});
@@ -510,7 +511,8 @@ export default function Home() {
         if (t) {
           await req(`/auth/verify?token=${encodeURIComponent(t)}`);
           const m = (await req("/auth/me")) as Me;
-          setMe(m);
+        setMe(m);
+        setNotifyPref(m?.notify_on_complete ?? true);
         }
       }
       setNoticeOk(r.already_verified ? "Email already verified." : "Verification email sent.");
@@ -994,6 +996,25 @@ export default function Home() {
                       Resend verification email
                     </button>
                   )}
+                  <label className="mt-4 flex items-center gap-2 text-sm text-zinc-600">
+                    <input
+                      type="checkbox"
+                      checked={notifyPref}
+                      onChange={async (e) => {
+                        const value = e.target.checked;
+                        setNotifyPref(value);
+                        try {
+                          await req("/auth/preferences", {
+                            method: "PUT",
+                            body: JSON.stringify({ notify_on_complete: value }),
+                          });
+                        } catch (err) {
+                          setNotice({ kind: "err", text: errMessage(err) });
+                        }
+                      }}
+                    />
+                    Email me when my notes are ready
+                  </label>
                 </div>
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-zinc-100 pt-4 text-sm">

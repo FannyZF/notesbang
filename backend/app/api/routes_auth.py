@@ -23,6 +23,7 @@ from app.schemas import (
     ForgotIn,
     LoginIn,
     LoginOut,
+    PreferencesIn,
     RegisterIn,
     RegisterOut,
     ResetIn,
@@ -129,6 +130,12 @@ def login(
     user = db.query(User).filter(User.email == payload.email.lower()).first()
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    if getattr(user, "banned", False):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail="Account suspended",
+            headers={"X-Error-Code": "ACCOUNT_BANNED"},
+        )
     token = new_token()
     db.add(ApiSession(user_id=user.id, token_digest=token_digest(token)))
     db.commit()
@@ -155,6 +162,17 @@ def change_password(
     user.password_hash = hash_password(payload.new)
     db.commit()
     return {"ok": True}
+
+
+@router.put("/preferences")
+def update_preferences(
+    payload: PreferencesIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user.notify_on_complete = payload.notify_on_complete
+    db.commit()
+    return {"ok": True, "notify_on_complete": user.notify_on_complete}
 
 
 @router.get("/export")

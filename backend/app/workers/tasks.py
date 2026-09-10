@@ -65,7 +65,7 @@ def generate_whole_task(db: Session, job: Job) -> None:
 
     from app.core.config import get_settings
 
-    if get_settings().notify_on_complete:
+    if get_settings().notify_on_complete and getattr(user, "notify_on_complete", True):
         try:
             from app.services.mail import send_generation_ready
 

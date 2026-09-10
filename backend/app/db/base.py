@@ -99,6 +99,7 @@ def ensure_schema() -> None:
         },
         "pages": {"note_mode": "script", "status": "parsed", "weight": 1.0},
         "jobs": {"phase": ""},
+        "users": {"banned": 0, "notify_on_complete": 1},
     }
     for table_name, columns in backfills.items():
         if not insp.has_table(table_name):

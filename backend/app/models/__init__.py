@@ -39,6 +39,8 @@ class User(Base):
     measured_speed_cps: Mapped[float | None] = mapped_column(
         Float, nullable=True
     )  # chars/words per second (PRD §4.4)
+    banned: Mapped[bool] = mapped_column(Boolean, default=False)
+    notify_on_complete: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     entitlement: Mapped["Entitlement"] = relationship(

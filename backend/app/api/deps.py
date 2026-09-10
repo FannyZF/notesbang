@@ -34,6 +34,12 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
         )
+    if getattr(user, "banned", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account suspended",
+            headers={"X-Error-Code": "ACCOUNT_BANNED"},
+        )
     return user
 
 

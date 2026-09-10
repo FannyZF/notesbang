@@ -40,6 +40,23 @@ class ResetIn(BaseModel):
     new: str = Field(min_length=8, max_length=128)
 
 
+class PreferencesIn(BaseModel):
+    notify_on_complete: bool
+
+
+class AdminPointsIn(BaseModel):
+    delta: int
+    note: str | None = None
+
+
+class AdminPlanIn(BaseModel):
+    plan_state: str = Field(pattern="^(trial|active|subscriber)$")
+
+
+class AdminBanIn(BaseModel):
+    banned: bool
+
+
 class LoginOut(BaseModel):
     token: str
     user_id: int
@@ -52,6 +69,7 @@ class UserOut(BaseModel):
     email: EmailStr
     email_verified: bool
     plan_state: str
+    notify_on_complete: bool = True
 
 
 # ---------- billing ----------

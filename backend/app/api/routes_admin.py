@@ -21,6 +21,7 @@ from app.models import (
     Project,
     User,
 )
+from app.schemas import AdminBanIn, AdminPlanIn, AdminPointsIn
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -91,6 +92,78 @@ def admin_summary(
             for u in recent
         ],
     }
+
+
+@router.post("/users/{user_id}/points")
+def admin_adjust_points(
+    user_id: int,
+    payload: AdminPointsIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    _require_admin(request)
+    import secrets
+
+    from sqlalchemy import update
+
+    from app.models import LedgerEntry, Wallet
+
+    user = db.get(User, user_id)
+    if user is None or user.wallet is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+    new_balance = user.wallet.balance + payload.delta
+    if new_balance < 0:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Balance cannot go negative"
+        )
+    db.execute(
+        update(Wallet)
+        .where(Wallet.id == user.wallet.id)
+        .values(balance=new_balance, version=Wallet.version + 1)
+    )
+    db.add(
+        LedgerEntry(
+            user_id=user.id,
+            kind="refund" if payload.delta > 0 else "charge",
+            amount=payload.delta,
+            provider_event_id=f"admin_{secrets.token_urlsafe(8)}",
+            note=payload.note or "admin adjustment",
+        )
+    )
+    db.commit()
+    return {"ok": True, "balance": new_balance}
+
+
+@router.post("/users/{user_id}/plan")
+def admin_set_plan(
+    user_id: int,
+    payload: AdminPlanIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    _require_admin(request)
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+    user.plan_state = payload.plan_state
+    db.commit()
+    return {"ok": True, "plan_state": user.plan_state}
+
+
+@router.post("/users/{user_id}/ban")
+def admin_set_ban(
+    user_id: int,
+    payload: AdminBanIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    _require_admin(request)
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+    user.banned = payload.banned
+    db.commit()
+    return {"ok": True, "banned": user.banned}
 
 
 @router.post("/maintenance/cleanup")
