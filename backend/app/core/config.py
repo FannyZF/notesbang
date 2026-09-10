@@ -55,6 +55,11 @@ class Settings:
         self.verify_ip_per_hour = int(os.getenv("VERIFY_IP_PER_HOUR", "60"))
         self.upload_user_per_hour = int(os.getenv("UPLOAD_USER_PER_HOUR", "30"))
         self.admin_token = os.getenv("ADMIN_TOKEN", "")
+        # Payment provider: "mock" (dev) or a real MoR adapter name.
+        self.payment_provider = os.getenv("PAYMENT_PROVIDER", "mock")
+        self.fastspring_api_key = os.getenv("FASTSPRING_API_KEY", "")
+        self.fastspring_store_id = os.getenv("FASTSPRING_STORE_ID", "")
+        self.fastspring_webhook_secret = os.getenv("FASTSPRING_WEBHOOK_SECRET", "")
         self.notify_on_complete = os.getenv("NOTIFY_ON_COMPLETE", "true").lower() in (
             "1",
             "true",

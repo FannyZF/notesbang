@@ -18,6 +18,8 @@ from app.models import (
     Wallet,
 )
 from app.schemas import (
+    CheckoutIn,
+    CheckoutOut,
     EntitlementOut,
     LedgerOut,
     SubscribeIn,
@@ -166,6 +168,39 @@ def get_pricing(db: Session = Depends(get_db)):
         for p in PRICING_PACKS
     ]
     return {"currency": "USD", "per_page_points": per, "packs": packs}
+
+
+@router.post("/checkout", response_model=CheckoutOut)
+def create_checkout(
+    payload: CheckoutIn,
+    user: User = Depends(require_verified),
+    db: Session = Depends(get_db),
+):
+    """Provider-agnostic checkout. Mock completes immediately; a real MoR
+    adapter returns a hosted checkout URL for redirect."""
+    from app.billing.gateway import get_payment_provider
+
+    unit = round(PRICING_PACKS[0]["usd"] / PRICING_PACKS[0]["points"], 4)
+    provider = get_payment_provider()
+    session = provider.create_checkout(
+        user_email=user.email, points=payload.points, unit_price_usd=unit
+    )
+    if session.completed:
+        wallet = settle_event(
+            db,
+            user,
+            payload.points,
+            "USD",
+            session.reference,
+            kind="topup",
+            note=f"checkout {provider.name}",
+        )
+        return CheckoutOut(
+            status="completed", points=payload.points, balance=wallet.balance
+        )
+    return CheckoutOut(
+        status="pending", points=payload.points, checkout_url=session.checkout_url
+    )
 
 
 @router.get("/wallet", response_model=WalletOut)

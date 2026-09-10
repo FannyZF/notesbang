@@ -60,6 +60,17 @@ class TopupIn(BaseModel):
     currency: str = Field(default="USD", max_length=8)
 
 
+class CheckoutIn(BaseModel):
+    points: int = Field(gt=0, le=100_000)
+
+
+class CheckoutOut(BaseModel):
+    status: str  # completed | pending
+    points: int
+    checkout_url: str | None = None
+    balance: int | None = None
+
+
 class LedgerOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

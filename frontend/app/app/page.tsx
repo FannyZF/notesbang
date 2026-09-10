@@ -412,15 +412,22 @@ export default function Home() {
 
   const topupAmount = async (amount: number) => {
     try {
-      const w = (await req("/billing/topup", {
+      const r = (await req("/billing/checkout", {
         method: "POST",
-        body: JSON.stringify({ amount, currency: "USD" }),
-      })) as Wallet;
-      setWallet(w);
-      const e = (await req("/billing/entitlements")) as Entitlements;
-      setEnt(e);
-      setPricingOpen(false);
-      setNoticeOk(`${amount} points added.`);
+        body: JSON.stringify({ points: amount }),
+      })) as { status: string; balance?: number; checkout_url?: string | null };
+      if (r.status === "completed") {
+        const [w, e] = (await Promise.all([
+          req("/billing/wallet"),
+          req("/billing/entitlements"),
+        ])) as [Wallet, Entitlements];
+        setWallet(w);
+        setEnt(e);
+        setPricingOpen(false);
+        setNoticeOk(`${amount} points added.`);
+      } else if (r.checkout_url) {
+        window.location.href = r.checkout_url;
+      }
     } catch (err) {
       setNotice({ kind: "err", text: errMessage(err) });
     }
