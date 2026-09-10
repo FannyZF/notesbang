@@ -16,4 +16,5 @@ boto3>=1.34
 alembic>=1.13
 redis>=5.0
 celery>=5.3
+psycopg[binary]>=3.2
 pytest>=8.2

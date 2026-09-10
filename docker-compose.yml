@@ -1,54 +1,130 @@
-# Phase 0 infrastructure services. The API/worker images are optional:
-# without Docker you can run the backend directly with SQLite (see README).
+# Production-ish stack: Postgres + Redis + MinIO + API + Celery worker/beat
+# + Next.js web + Caddy (auto HTTPS). Set DOMAIN and secrets via .env.
 services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: spekernotes
-      POSTGRES_PASSWORD: spekernotes_dev
-      POSTGRES_DB: spekernotes
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-notesbang}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-notesbang_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-notesbang}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U spekernotes"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-notesbang}"]
       interval: 5s
       timeout: 3s
       retries: 10
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
 
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: spekernotes
-      MINIO_ROOT_PASSWORD: spekernotes_dev_secret
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-notesbang}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-notesbang_dev_secret}
     volumes:
       - miniodata:/data
 
   api:
     build: ./backend
     environment:
-      ENVIRONMENT: development
-      DATABASE_URL: postgresql+psycopg://spekernotes:spekernotes_dev@postgres:5432/spekernotes
-      MAIL_DRIVER: console
-      APP_BASE_URL: http://localhost:8000
-      PAGE_LIMIT: "80"
-      TRIAL_PAGES_LIMIT: "2"
-    ports:
-      - "8000:8000"
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-notesbang}:${POSTGRES_PASSWORD:-notesbang_dev}@postgres:5432/${POSTGRES_DB:-notesbang}
+      REDIS_URL: redis://redis:6379/0
+      TASK_BACKEND: celery
+      EXEC_ASYNC: "true"
+      STORAGE_BACKEND: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: ${S3_BUCKET:-notesbang}
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-notesbang}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-notesbang_dev_secret}
+      S3_SECURE: "false"
+      RENDER_SLIDES: "true"
+      VISION_ENABLED: "true"
+      MAIL_DRIVER: ${MAIL_DRIVER:-console}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      PUBLIC_WEB_URL: https://${DOMAIN:-localhost}
+      APP_BASE_URL: https://${DOMAIN:-localhost}
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
+
+  worker:
+    build: ./backend
+    command: celery -A app.workers.celery_app.celery_app worker -Q jobs --loglevel=info
+    environment:
+      RUN_MIGRATIONS: "false"
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-notesbang}:${POSTGRES_PASSWORD:-notesbang_dev}@postgres:5432/${POSTGRES_DB:-notesbang}
+      REDIS_URL: redis://redis:6379/0
+      TASK_BACKEND: celery
+      STORAGE_BACKEND: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: ${S3_BUCKET:-notesbang}
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-notesbang}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-notesbang_dev_secret}
+      RENDER_SLIDES: "true"
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+    depends_on:
+      - api
+
+  beat:
+    build: ./backend
+    command: celery -A app.workers.celery_app.celery_app beat --loglevel=info
+    environment:
+      RUN_MIGRATIONS: "false"
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-notesbang}:${POSTGRES_PASSWORD:-notesbang_dev}@postgres:5432/${POSTGRES_DB:-notesbang}
+      REDIS_URL: redis://redis:6379/0
+      TASK_BACKEND: celery
+      STORAGE_BACKEND: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: ${S3_BUCKET:-notesbang}
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-notesbang}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-notesbang_dev_secret}
+    depends_on:
+      - redis
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE: https://${DOMAIN:-localhost}/api
+    depends_on:
+      - api
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on:
+      - web
+      - api
 
 volumes:
   pgdata:
+  redisdata:
   miniodata:
+  caddydata:
+  caddyconfig:
