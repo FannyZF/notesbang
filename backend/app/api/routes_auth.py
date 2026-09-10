@@ -157,6 +157,75 @@ def change_password(
     return {"ok": True}
 
 
+@router.delete("/account")
+def delete_account(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete the account and all associated data (GDPR erasure)."""
+    from app.models import (
+        GenerationLog,
+        Job,
+        LedgerEntry,
+        Page,
+        PageRevision,
+        Project,
+        Section,
+        StyleProfile,
+        StyleSample,
+        Subscription,
+    )
+    from app.services.storage import get_storage
+
+    storage = get_storage()
+    projects = db.query(Project).filter(Project.user_id == user.id).all()
+    page_ids: list[int] = []
+    for project in projects:
+        storage.delete(project.source_key)
+        page_ids.extend(
+            row[0]
+            for row in db.query(Page.id).filter(Page.project_id == project.id).all()
+        )
+    if page_ids:
+        db.query(PageRevision).filter(PageRevision.page_id.in_(page_ids)).delete(
+            synchronize_session=False
+        )
+    project_ids = [p.id for p in projects]
+    if project_ids:
+        db.query(GenerationLog).filter(
+            GenerationLog.project_id.in_(project_ids)
+        ).delete(synchronize_session=False)
+        db.query(Job).filter(Job.project_id.in_(project_ids)).delete(
+            synchronize_session=False
+        )
+        db.query(Section).filter(Section.project_id.in_(project_ids)).delete(
+            synchronize_session=False
+        )
+        db.query(Page).filter(Page.project_id.in_(project_ids)).delete(
+            synchronize_session=False
+        )
+        db.query(Project).filter(Project.id.in_(project_ids)).delete(
+            synchronize_session=False
+        )
+
+    db.query(StyleSample).filter(StyleSample.user_id == user.id).delete()
+    db.query(StyleProfile).filter(StyleProfile.user_id == user.id).delete()
+    db.query(Subscription).filter(Subscription.user_id == user.id).delete()
+    db.query(LedgerEntry).filter(LedgerEntry.user_id == user.id).delete()
+    db.query(ApiSession).filter(ApiSession.user_id == user.id).delete()
+    db.query(EmailVerificationToken).filter(
+        EmailVerificationToken.user_id == user.id
+    ).delete()
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id
+    ).delete()
+    db.query(Entitlement).filter(Entitlement.user_id == user.id).delete()
+    db.query(Wallet).filter(Wallet.user_id == user.id).delete()
+    db.delete(user)
+    db.commit()
+    return {"ok": True}
+
+
 @router.post("/resend-verification")
 def resend_verification(
     request: Request,

@@ -675,6 +675,22 @@ export default function Home() {
     }
   };
 
+  const deleteMyAccount = async () => {
+    if (
+      !window.confirm(
+        "Delete your account and ALL data (projects, notes, samples, balance)? This cannot be undone."
+      )
+    )
+      return;
+    try {
+      await req("/auth/account", { method: "DELETE" });
+      logout();
+      setNoticeOk("Account deleted.");
+    } catch (err) {
+      setNotice({ kind: "err", text: errMessage(err) });
+    }
+  };
+
   // ---- pace recorder ----
   const submitSpeed = useCallback(
     async (ms: number, lang: "zh" | "en") => {
@@ -943,6 +959,20 @@ export default function Home() {
                     </button>
                   )}
                 </div>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-zinc-100 pt-4 text-sm">
+                <a href="/privacy" target="_blank" rel="noreferrer" className="text-zinc-500 hover:text-zinc-800">
+                  Privacy Policy
+                </a>
+                <a href="/terms" target="_blank" rel="noreferrer" className="text-zinc-500 hover:text-zinc-800">
+                  Terms of Use
+                </a>
+                <button
+                  onClick={() => void deleteMyAccount()}
+                  className="ml-auto rounded-full border border-red-200 px-4 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                >
+                  Delete account
+                </button>
               </div>
             </details>
           </section>

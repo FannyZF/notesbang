@@ -373,6 +373,7 @@ export default function Landing() {
           <nav className="flex items-center gap-4 text-xs text-zinc-600">
             <a href="#pricing" className="transition hover:text-zinc-300">Pricing</a>
             <a href="/terms" className="transition hover:text-zinc-300">Terms of use</a>
+            <a href="/privacy" className="transition hover:text-zinc-300">Privacy</a>
             <a href="#faq" className="transition hover:text-zinc-300">FAQ</a>
           </nav>
         </div>
