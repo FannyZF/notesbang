@@ -1,25 +1,45 @@
-"""Mail delivery.
+"""Mail delivery with HTML templates.
 
-- "console": prints the verification link (dev direct-through) and returns it.
-- "smtp": sends a real email via SMTP (STARTTLS), configured from env vars.
+- "console": prints the link (dev direct-through) and returns it.
+- "smtp": sends multipart (plain + HTML) email via SMTP STARTTLS.
 Secrets come from env only (PRD §14.7.3).
 """
 from __future__ import annotations
 
 import smtplib
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
 
 from app.core.config import Settings
 
 
-def _send_smtp(settings: Settings, to_email: str, subject: str, body: str) -> None:
+def _html(title: str, body: str, cta: str, url: str) -> str:
+    return f"""\
+<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+            max-width:520px;margin:0 auto;padding:32px 24px;color:#18181b">
+  <div style="font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#a1a1aa">
+    NotesBang
+  </div>
+  <h1 style="font-size:22px;margin:12px 0 8px">{title}</h1>
+  <p style="font-size:15px;line-height:1.6;color:#52525b;margin:0 0 20px">{body}</p>
+  <a href="{url}" style="display:inline-block;background:#18181b;color:#fff;text-decoration:none;
+     padding:12px 22px;border-radius:999px;font-size:15px;font-weight:500">{cta}</a>
+  <p style="font-size:12px;color:#a1a1aa;margin-top:24px;word-break:break-all">{url}</p>
+</div>"""
+
+
+def _send_smtp(
+    settings: Settings, to_email: str, subject: str, text: str, html: str
+) -> None:
     if not settings.smtp_host or not settings.smtp_from:
         raise RuntimeError("SMTP_HOST / SMTP_FROM not configured")
-    msg = MIMEText(body, "plain", "utf-8")
+    msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = formataddr(("NotesBang", settings.smtp_from))
     msg["To"] = to_email
+    msg.attach(MIMEText(text, "plain", "utf-8"))
+    msg.attach(MIMEText(html, "html", "utf-8"))
 
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as server:
         server.ehlo()
@@ -38,14 +58,19 @@ def send_verification_link(settings: Settings, email: str, token: str) -> str | 
         print(f"[console-mail] to={email} verify={url}", flush=True)
         return url
     if driver == "smtp":
-        subject = "Confirm your NotesBang account"
-        body = (
+        text = (
             "Welcome to NotesBang!\n\n"
             "Please confirm your email address to start creating speaker notes:\n"
-            f"{url}\n\n"
-            "This link expires soon. If you did not sign up, you can ignore this email."
+            f"{url}\n\nThis link expires soon."
         )
-        _send_smtp(settings, email, subject, body)
+        html = _html(
+            "Confirm your email",
+            "Welcome to NotesBang — confirm your email address to start creating "
+            "speaker notes.",
+            "Confirm email",
+            url,
+        )
+        _send_smtp(settings, email, "Confirm your NotesBang account", text, html)
         return None
     raise NotImplementedError(f"mail driver '{driver}' not implemented")
 
@@ -57,14 +82,18 @@ def send_reset_link(settings: Settings, email: str, token: str) -> str | None:
         print(f"[console-mail] to={email} reset={url}", flush=True)
         return url
     if driver == "smtp":
-        subject = "Reset your NotesBang password"
-        body = (
+        text = (
             "We received a request to reset your NotesBang password.\n\n"
-            f"Set a new password here:\n{url}\n\n"
-            "This link expires soon. If you did not ask to reset it, you can ignore "
-            "this email."
+            f"Set a new password here:\n{url}\n\nIf you did not ask, ignore this email."
         )
-        _send_smtp(settings, email, subject, body)
+        html = _html(
+            "Reset your password",
+            "We received a request to reset your NotesBang password. Choose a new "
+            "one below. If you did not ask, you can ignore this email.",
+            "Set new password",
+            url,
+        )
+        _send_smtp(settings, email, "Reset your NotesBang password", text, html)
         return None
     raise NotImplementedError(f"mail driver '{driver}' not implemented")
 
@@ -81,12 +110,17 @@ def send_generation_ready(
         )
         return
     if settings.mail_driver == "smtp":
-        subject = "Your speaker notes are ready"
-        body = (
+        text = (
             f'Good news — the speaker notes for "{project_title}" are ready.\n\n'
-            f"Open them here:\n{url}\n\nYou can close this window; the notes are saved "
-            "to your account."
+            f"Open them here:\n{url}"
         )
-        _send_smtp(settings, email, subject, body)
+        html = _html(
+            "Your notes are ready",
+            f'The speaker notes for "{project_title}" are ready. Open them and give '
+            "them a final read.",
+            "Open NotesBang",
+            url,
+        )
+        _send_smtp(settings, email, "Your speaker notes are ready", text, html)
         return
     # console/smtp only; other drivers silently skip notifications
