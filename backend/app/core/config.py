@@ -61,6 +61,20 @@ class Settings:
             "yes",
         )
         self.public_web_url = os.getenv("PUBLIC_WEB_URL", "http://localhost:3000")
+        # Object storage (MinIO/S3 compatible). "local" keeps files on disk
+        # (dev/tests); "s3" uses boto3 against S3_ENDPOINT.
+        self.storage_backend = os.getenv("STORAGE_BACKEND", "local")  # local | s3
+        self.storage_dir = os.getenv("STORAGE_DIR", "storage")
+        self.s3_endpoint = os.getenv("S3_ENDPOINT", "")
+        self.s3_bucket = os.getenv("S3_BUCKET", "notesbang")
+        self.s3_access_key = os.getenv("S3_ACCESS_KEY", "")
+        self.s3_secret_key = os.getenv("S3_SECRET_KEY", "")
+        self.s3_region = os.getenv("S3_REGION", "us-east-1")
+        self.s3_secure = os.getenv("S3_SECURE", "false").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
         self.export_enabled = os.getenv("EXPORT_ENABLED", "false").lower() in (
             "1",
             "true",

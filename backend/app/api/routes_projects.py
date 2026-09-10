@@ -1,7 +1,6 @@
 """Project routes: upload + parse pipeline, preview, list."""
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 from fastapi import (
@@ -49,8 +48,8 @@ from app.services.billing import (
     is_paid,
     required_price_pages,
 )
-from app.services.files import upload_path
 from app.services.rate_limit import enforce
+from app.services.storage import get_storage
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -75,15 +74,14 @@ async def upload_project(
         )
 
     source_key = f"{user.id}/{Path(file.filename or 'file.pptx').name}"
-    dest = upload_path(source_key)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    with dest.open("wb") as out:
-        shutil.copyfileobj(file.file, out)
+    storage = get_storage()
+    storage.save_bytes(source_key, await file.read())
 
     try:
-        page_count = pptx_parser.count_pptx_pages(str(dest))
+        with storage.materialize(source_key) as src:
+            page_count = pptx_parser.count_pptx_pages(str(src))
     except Exception as exc:  # corrupt / malformed pptx
-        dest.unlink(missing_ok=True)
+        storage.delete(source_key)
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Failed to open PPTX; file may be corrupted",
@@ -92,7 +90,7 @@ async def upload_project(
 
     allowed, reason = can_upload_pages(user, page_count)
     if not allowed:
-        dest.unlink(missing_ok=True)
+        storage.delete(source_key)
         code = 402 if reason == "TRIAL_USED_NEED_FUNDS" else 403
         raise HTTPException(
             code,
@@ -115,7 +113,8 @@ async def upload_project(
     db.flush()
 
     try:
-        pages = pptx_parser.parse_pptx(str(dest))
+        with storage.materialize(source_key) as src:
+            pages = pptx_parser.parse_pptx(str(src))
     except Exception as exc:
         project.status = "parse_failed"
         job.status = "failed"
@@ -240,16 +239,17 @@ def export_project(
     else:
         from app.exporters.pptx_writer import write_pptx_notes
 
-        src = upload_path(project.source_key)
-        if not src.exists():
+        storage = get_storage()
+        if not storage.exists(project.source_key):
             raise HTTPException(
                 status.HTTP_410_GONE,
                 detail="Original file missing",
                 headers={"X-Error-Code": "SOURCE_MISSING"},
             )
-        content = write_pptx_notes(
-            src, [(p.ord, p.note_text) for p in pages], strategy=strategy
-        )
+        with storage.materialize(project.source_key) as src:
+            content = write_pptx_notes(
+                src, [(p.ord, p.note_text) for p in pages], strategy=strategy
+            )
         media_type = (
             "application/vnd.openxmlformats-officedocument.presentationml.presentation"
         )
@@ -326,8 +326,7 @@ def delete_project(
         synchronize_session=False
     )
     db.query(Page).filter(Page.project_id == project.id).delete(synchronize_session=False)
-    src = upload_path(project.source_key)
-    src.unlink(missing_ok=True)
+    get_storage().delete(project.source_key)
     db.delete(project)
     db.commit()
     return {"ok": True, "deleted_project_id": project.id}
