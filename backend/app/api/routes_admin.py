@@ -93,6 +93,18 @@ def admin_summary(
     }
 
 
+@router.post("/maintenance/cleanup")
+def run_cleanup(
+    request: Request,
+    ttl_days: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    _require_admin(request)
+    from app.services.cleanup import cleanup_expired
+
+    return cleanup_expired(db, ttl_days)
+
+
 @router.get("/users")
 def admin_users(
     request: Request,

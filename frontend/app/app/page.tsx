@@ -692,6 +692,25 @@ export default function Home() {
     }
   };
 
+  const exportMyData = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/export`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "notesbang-export.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      setNoticeOk("Your data export has been downloaded.");
+    } catch (err) {
+      setNotice({ kind: "err", text: errMessage(err) });
+    }
+  };
+
   const deleteMyAccount = async () => {
     if (
       !window.confirm(
@@ -984,6 +1003,12 @@ export default function Home() {
                 <a href="/terms" target="_blank" rel="noreferrer" className="text-zinc-500 hover:text-zinc-800">
                   Terms of Use
                 </a>
+                <button
+                  onClick={() => void exportMyData()}
+                  className="rounded-full border border-zinc-300 px-4 py-1.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+                >
+                  Download my data
+                </button>
                 <button
                   onClick={() => void deleteMyAccount()}
                   className="ml-auto rounded-full border border-red-200 px-4 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-50"

@@ -25,3 +25,9 @@ celery_app.conf.update(
     broker_connection_retry_on_startup=True,
     task_default_queue="jobs",
 )
+celery_app.conf.beat_schedule = {
+    "retention-cleanup-daily": {
+        "task": "jobs.retention_cleanup",
+        "schedule": 24 * 60 * 60,
+    }
+}

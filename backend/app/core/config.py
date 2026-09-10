@@ -93,6 +93,7 @@ class Settings:
             "yes",
         )
         self.vision_max_pages = int(os.getenv("VISION_MAX_PAGES", "20"))
+        self.retention_days = int(os.getenv("RETENTION_DAYS", "30"))
         self.export_enabled = os.getenv("EXPORT_ENABLED", "false").lower() in (
             "1",
             "true",

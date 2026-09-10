@@ -157,6 +157,77 @@ def change_password(
     return {"ok": True}
 
 
+@router.get("/export")
+def export_account_data(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Download all of the user's data as JSON (GDPR portability)."""
+    import json
+
+    from fastapi import Response
+
+    from app.models import LedgerEntry, Page, Project, StyleProfile, StyleSample
+
+    projects = db.query(Project).filter(Project.user_id == user.id).all()
+    payload = {
+        "account": {
+            "email": user.email,
+            "plan_state": user.plan_state,
+            "email_verified": user.email_verified,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+        },
+        "projects": [
+            {
+                "title": p.title,
+                "source_format": p.source_format,
+                "target_minutes": p.target_minutes,
+                "note_mode": p.note_mode,
+                "style": p.style,
+                "custom_scenario": p.custom_scenario,
+                "output_lang": p.output_lang,
+                "pages": [
+                    {
+                        "ord": pg.ord,
+                        "raw_text": pg.raw_text,
+                        "note_text": pg.note_text,
+                        "note_mode": pg.note_mode,
+                    }
+                    for pg in db.query(Page)
+                    .filter(Page.project_id == p.id)
+                    .order_by(Page.ord)
+                    .all()
+                ],
+            }
+            for p in projects
+        ],
+        "style_samples": [
+            {"title": s.title, "text": s.text}
+            for s in db.query(StyleSample).filter(StyleSample.user_id == user.id).all()
+        ],
+        "style_profiles": [
+            {"name": sp.name, "profile_text": sp.profile_text}
+            for sp in db.query(StyleProfile)
+            .filter(StyleProfile.user_id == user.id)
+            .all()
+        ],
+        "ledger": [
+            {"kind": e.kind, "amount": e.amount, "created_at": e.created_at.isoformat()}
+            for e in db.query(LedgerEntry)
+            .filter(LedgerEntry.user_id == user.id)
+            .all()
+        ],
+    }
+    body = json.dumps(payload, ensure_ascii=False, indent=2)
+    return Response(
+        content=body,
+        media_type="application/json",
+        headers={
+            "Content-Disposition": "attachment; filename*=UTF-8''notesbang-export.json"
+        },
+    )
+
+
 @router.delete("/account")
 def delete_account(
     user: User = Depends(get_current_user),
