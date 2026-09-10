@@ -1,7 +1,7 @@
 # NotesBang — monorepo
 
 AI speaker notes generator. Product/business requirements live in
-[`docs/PRD.md`](docs/PRD.md) (see **§15 DoD** for Phase 0 acceptance).
+[`docs/PRD.md`](docs/PRD.md). Operations guide: [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
 
 ## Repository layout
 
@@ -91,6 +91,28 @@ provider. Real MoR/PayPal integration is scheduled for Phase 3 (PRD §2.4).
 3. `GET /api/billing/entitlements` → `export_locked` until balance > 0.
 4. `POST /api/billing/topup` → wallet credited (ledger row written).
 5. `POST /api/projects/{id}/export` → `402 EXPORT_LOCKED` (trial) / `501` (paid, Phase 2).
+
+## Production hardening (P0/P1 — done)
+
+- **Migrations**: Alembic (`backend/alembic`), run `alembic upgrade head`
+  (API container does this automatically on start).
+- **Storage**: object storage abstraction (`STORAGE_BACKEND=local|s3`) with
+  MinIO/S3 support; local disk fallback for dev/tests.
+- **Queue**: Celery + Redis (`TASK_BACKEND=celery`), worker + beat containers;
+  thread pool remains the dev default. Rate limiting uses Redis when configured.
+- **Observability**: JSON logs + `X-Request-ID`, optional Sentry, Prometheus
+  `/metrics`.
+- **Compliance**: account deletion (`DELETE /api/auth/account`), data export
+  (`GET /api/auth/export`), retention TTL cleanup (`RETENTION_DAYS`, Celery beat
+  or `POST /api/admin/maintenance/cleanup`), Privacy Policy page.
+- **Payments**: provider framework (`billing/providers/*`, `PAYMENT_PROVIDER`);
+  mock completes offline, real MoR adapter slot ready.
+- **Quality**: 4-stage generation + whole-deck consistency pass; slide image
+  rendering + thumbnails + budgeted vision (needs LibreOffice, `RENDER_SLIDES`).
+- **Admin**: user search, points adjust/refund, plan override, ban/unban
+  (`/admin`, `ADMIN_TOKEN`), notification preferences.
+- **Deploy**: full `docker-compose` (postgres, redis, minio, api, worker, beat,
+  web, caddy auto-HTTPS) + GitHub Actions CI.
 
 ## Key Phase 1 API flows
 
