@@ -23,6 +23,7 @@ from app.llm.gateway import LLMError, LLMResult, Provider, get_provider
 from app.llm.renderer import load_style, render_notes_system
 from app.models import GenerationLog, Page, Project, StyleProfile, User
 from app.pipeline.contexts import StoryTrace, build_user_context, first_hook
+from app.pipeline.consistency import consistency_review
 from app.pipeline.outline import build_deck_outline, summarize
 
 PHASES = [
@@ -201,11 +202,12 @@ def generate(
     tolerance_pct = f"{int(settings.char_tolerance * 100)}%"
 
     phases = PHASES if (project.quality_mode or "full") != "fast" else PHASES[:1]
+    do_consistency = page_ids is None and len(phases) > 1
 
     current: dict[int, str] = {}
     acc: dict[int, _Acc] = {p.id: _Acc() for p in pages}
     N = len(pages)
-    steps = len(phases) * N
+    steps = len(phases) * N + (1 if do_consistency else 0)
     step = 0
 
     def progress(phase_label: str) -> None:
@@ -285,6 +287,27 @@ def generate(
             current[page.id] = improved
             acc[page.id].add(result)
             progress(phase_label)
+
+    # ---- Phase 5: whole-deck consistency pass ----
+    if do_consistency:
+        ord_to_id = {p.ord: p.id for p in pages}
+        ord_to_target = {pages[i].ord: targets[i] for i in range(N)}
+        patches, cresult = consistency_review(
+            provider,
+            [(p.ord, current[p.id]) for p in pages if p.id in target_ids],
+            outline_text,
+        )
+        for patch in patches:
+            pid = ord_to_id.get(patch.page)
+            if pid is None or pid not in target_ids:
+                continue
+            current[pid] = fit_notes(
+                patch.revised, ord_to_target[patch.page], settings.char_tolerance
+            )
+        if cresult is not None:
+            first_id = next(iter(target_ids))
+            acc[first_id].add(cresult)
+        progress("Polishing for consistency across slides")
 
     # ---- Persist refined notes ----
     for page in pages:
