@@ -48,11 +48,20 @@ def generate_whole_task(db: Session, job: Job) -> None:
     if project is None:
         raise RuntimeError("project not found")
     user = db.get(User, project.user_id)
-    generate(db, user, project, on_progress=_progress_of(job, db))  # writes + logs
+    stats = generate(db, user, project, on_progress=_progress_of(job, db))
     page_count = (
         db.query(Page).filter(Page.project_id == project.id).count()
     )
     _settle(db, user, job, page_count, "whole")
+
+    try:
+        from app.core.metrics import GENERATED_PAGES, GENERATIONS, LLM_COST
+
+        GENERATIONS.labels("success").inc()
+        GENERATED_PAGES.inc(page_count)
+        LLM_COST.inc(float(stats.get("cost", 0.0)))
+    except Exception:  # noqa: BLE001
+        pass
 
     from app.core.config import get_settings
 

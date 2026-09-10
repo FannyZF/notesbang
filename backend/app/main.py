@@ -1,9 +1,10 @@
 """FastAPI application entrypoint."""
 from __future__ import annotations
 
+import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (
@@ -15,7 +16,17 @@ from app.api import (
     routes_styles,
 )
 from app.core.config import get_settings
+from app.core.metrics import HTTP_LATENCY, HTTP_REQUESTS, render_metrics
+from app.core.observability import (
+    init_sentry,
+    new_request_id,
+    request_id_ctx,
+    setup_logging,
+)
 from app.db.base import init_db
+
+setup_logging()
+init_sentry()
 
 
 @asynccontextmanager
@@ -41,6 +52,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def observability_middleware(request: Request, call_next):
+    rid = new_request_id()
+    request_id_ctx.set(rid)
+    started = time.perf_counter()
+    response = await call_next(request)
+    elapsed = time.perf_counter() - started
+    path = request.url.path
+    if path != "/metrics":
+        HTTP_REQUESTS.labels(request.method, path, str(response.status_code)).inc()
+        HTTP_LATENCY.labels(request.method, path).observe(elapsed)
+    response.headers["X-Request-ID"] = rid
+    return response
+
+
 API_PREFIX = "/api"
 app.include_router(routes_auth.router, prefix=API_PREFIX)
 app.include_router(routes_projects.router, prefix=API_PREFIX)
@@ -53,3 +80,9 @@ app.include_router(routes_admin.router, prefix=API_PREFIX)
 @app.get("/healthz", tags=["system"])
 def healthz() -> dict:
     return {"status": "ok", "environment": settings.environment}
+
+
+@app.get("/metrics", tags=["system"])
+def metrics() -> Response:
+    data, content_type = render_metrics()
+    return Response(content=data, media_type=content_type)

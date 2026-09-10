@@ -306,4 +306,10 @@ def generate(
         )
 
     db.commit()
-    return {"updated": len(target_ids), "total_units": total_units, "mode": mode}
+    total_cost = sum(acc[pid].cost for pid in target_ids)
+    return {
+        "updated": len(target_ids),
+        "total_units": total_units,
+        "mode": mode,
+        "cost": round(total_cost, 6),
+    }
