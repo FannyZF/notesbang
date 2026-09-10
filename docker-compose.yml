@@ -1,0 +1,54 @@
+# Phase 0 infrastructure services. The API/worker images are optional:
+# without Docker you can run the backend directly with SQLite (see README).
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: spekernotes
+      POSTGRES_PASSWORD: spekernotes_dev
+      POSTGRES_DB: spekernotes
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spekernotes"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: spekernotes
+      MINIO_ROOT_PASSWORD: spekernotes_dev_secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+
+  api:
+    build: ./backend
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+psycopg://spekernotes:spekernotes_dev@postgres:5432/spekernotes
+      MAIL_DRIVER: console
+      APP_BASE_URL: http://localhost:8000
+      PAGE_LIMIT: "80"
+      TRIAL_PAGES_LIMIT: "2"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  miniodata:
