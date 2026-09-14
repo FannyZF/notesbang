@@ -5,6 +5,33 @@
 Celery beat, Next.js web, Caddy (auto-HTTPS). Set `DOMAIN` and secrets in `.env`
 (see `.env.example`).
 
+## Server sizing
+
+The LLM calls are network-bound; the real resource cost is **LibreOffice
+headless rendering** (PPTX→PDF), which is CPU/RAM heavy (~300–500 MB per
+process). Everything else is light.
+
+| Tier | vCPU | RAM | Disk | Notes |
+|---|---|---|---|---|
+| Demo / very low traffic | 2 | 4 GB (+2 GB swap) | 40 GB SSD | `worker --concurrency=1..2`, or `RENDER_SLIDES=false` |
+| Recommended launch | 4 | 8 GB (+2–4 GB swap) | 80 GB SSD | `worker --concurrency=2..3` |
+| Growth | 8 | 16 GB | 160 GB+ | separate worker host; managed Postgres/Redis/S3 |
+
+Per-service RAM (rough): Postgres 200–500 MB, Redis ~50 MB, MinIO 100–200 MB,
+API 200–400 MB, worker 400 MB + ~400 MB per render process, beat ~100 MB,
+Next.js standalone 150–300 MB, Caddy ~30 MB.
+
+Storage: source ≤50 MB/deck + ~0.2–0.5 MB per slide image; ~1000 decks/month ≈
+10–30 GB with `RETENTION_DAYS=30`. Offload to S3 (`STORAGE_BACKEND=s3`) to scale.
+
+Rules of thumb:
+- Set Celery concurrency from RAM (2 on 4 GB, 3–4 on 8 GB); LibreOffice spikes.
+- `RENDER_SLIDES=false` removes most CPU/RAM cost (no thumbnails/vision).
+- Web/API are stateless (rate limiting via Redis) → scale horizontally;
+  scale workers separately, they dominate CPU.
+- OS: Ubuntu 22.04/24.04 LTS + Docker & Compose v2; expose only 80/443/SSH.
+- Prefer servers with good network proximity to the LLM provider.
+
 ## First deploy
 ```bash
 cp .env.example .env      # fill DOMAIN, DEEPSEEK_API_KEY, ADMIN_TOKEN, SMTP_*, passwords
