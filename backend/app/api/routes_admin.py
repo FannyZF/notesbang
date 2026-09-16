@@ -178,6 +178,112 @@ def run_cleanup(
     return cleanup_expired(db, ttl_days)
 
 
+@router.get("/corpus/stats")
+def corpus_stats(request: Request, db: Session = Depends(get_db)):
+    _require_admin(request)
+    from app.models import Analysis, CorpusFeature, DimensionScore, Document, Feedback
+
+    total_docs = db.query(func.count(Document.id)).scalar() or 0
+    with_consent = (
+        db.query(func.count(Document.id))
+        .filter(Document.consent_improve.is_(True))
+        .scalar()
+        or 0
+    )
+    feature_rows = db.query(CorpusFeature).all()
+    outcome_ready = sum(1 for f in feature_rows if f.outcome_json not in ("", "{}"))
+    by_platform: dict[str, int] = {}
+    for f in feature_rows:
+        by_platform[f.platform] = by_platform.get(f.platform, 0) + 1
+
+    score_rows = db.query(Analysis).all()
+    avg_overall = round(
+        sum(a.overall_score for a in score_rows) / max(len(score_rows), 1), 1
+    )
+    dim_rows = db.query(DimensionScore).all()
+    dim_avg: dict[str, float] = {}
+    dim_counts: dict[str, int] = {}
+    for d in dim_rows:
+        dim_avg[d.key] = dim_avg.get(d.key, 0.0) + d.score
+        dim_counts[d.key] = dim_counts.get(d.key, 0) + 1
+    dim_avg = {k: round(v / dim_counts[k], 1) for k, v in dim_avg.items()}
+
+    feedback_rows = db.query(Feedback).all()
+    by_action: dict[str, int] = {}
+    for fb in feedback_rows:
+        by_action[fb.action] = by_action.get(fb.action, 0) + 1
+
+    return {
+        "documents": total_docs,
+        "with_consent": with_consent,
+        "corpus_features": len(feature_rows),
+        "outcome_ready": outcome_ready,
+        "by_platform": by_platform,
+        "analyses": len(score_rows),
+        "avg_overall_score": avg_overall,
+        "dimension_avg_score": dim_avg,
+        "feedback": by_action,
+    }
+
+
+@router.get("/corpus/export")
+def corpus_export(request: Request, db: Session = Depends(get_db)):
+    """Anonymized JSONL: features + per-dimension scores + feedback (no raw text)."""
+    _require_admin(request)
+    import json as _json
+
+    from app.models import Analysis, CorpusFeature, DimensionScore, Document, Feedback
+
+    docs = db.query(Document).filter(Document.consent_improve.is_(True)).all()
+    lines: list[str] = []
+    for doc in docs:
+        feature = (
+            db.query(CorpusFeature).filter(CorpusFeature.document_id == doc.id).first()
+        )
+        analysis = (
+            db.query(Analysis)
+            .filter(Analysis.document_id == doc.id)
+            .order_by(Analysis.id.desc())
+            .first()
+        )
+        dims = []
+        if analysis is not None:
+            dims = [
+                {"key": d.key, "band": d.band, "score": d.score}
+                for d in db.query(DimensionScore)
+                .filter(DimensionScore.analysis_id == analysis.id)
+                .all()
+            ]
+        fb = [
+            f.action
+            for f in db.query(Feedback).filter(Feedback.document_id == doc.id).all()
+        ]
+        lines.append(
+            _json.dumps(
+                {
+                    "document_id": doc.id,
+                    "platform": doc.platform,
+                    "language": doc.language,
+                    "char_count": doc.char_count,
+                    "features": _json.loads(feature.features_json) if feature else {},
+                    "outcome": _json.loads(feature.outcome_json) if feature else {},
+                    "overall_score": analysis.overall_score if analysis else None,
+                    "dimensions": dims,
+                    "feedback": fb,
+                },
+                ensure_ascii=False,
+            )
+        )
+    from fastapi import Response
+
+    body = ("\n".join(lines) + ("\n" if lines else "")).encode("utf-8")
+    return Response(
+        content=body,
+        media_type="application/x-ndjson",
+        headers={"Content-Disposition": 'attachment; filename="corpus.jsonl"'},
+    )
+
+
 @router.get("/users")
 def admin_users(
     request: Request,

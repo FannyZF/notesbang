@@ -423,6 +423,34 @@ def submit_feedback(
     return {"ok": True}
 
 
+@router.post("/{doc_id}/outcome")
+def record_outcome(
+    doc_id: int,
+    payload: dict,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Optional real-world outcome (reads/likes/saves) for the corpus label."""
+    doc = _owned(db, doc_id, user)
+    if not doc.consent_improve:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail="Consent for improvement is off for this document",
+            headers={"X-Error-Code": "CONSENT_OFF"},
+        )
+    feature = (
+        db.query(CorpusFeature)
+        .filter(CorpusFeature.document_id == doc.id)
+        .first()
+    )
+    if feature is None:
+        feature = CorpusFeature(document_id=doc.id, platform=doc.platform)
+        db.add(feature)
+    feature.outcome_json = json.dumps(payload, ensure_ascii=False)
+    db.commit()
+    return {"ok": True}
+
+
 @router.get("/{doc_id}/export")
 def export_document(
     doc_id: int,
