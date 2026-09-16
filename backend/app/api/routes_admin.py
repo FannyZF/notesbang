@@ -14,11 +14,10 @@ from sqlalchemy.orm import Session
 
 from app.db.base import get_db
 from app.models import (
+    Analysis,
+    Document,
     Entitlement,
-    GenerationLog,
     LedgerEntry,
-    Page,
-    Project,
     User,
 )
 from app.schemas import AdminBanIn, AdminPlanIn, AdminPointsIn
@@ -55,14 +54,12 @@ def admin_summary(
     trial_used = (
         db.query(func.count(Entitlement.id)).filter(Entitlement.trial_used.is_(True)).scalar() or 0
     )
-    projects = db.query(func.count(Project.id)).scalar() or 0
-    generated_pages = (
-        db.query(func.count(Page.id)).filter(Page.note_text != "").scalar() or 0
-    )
+    documents = db.query(func.count(Document.id)).scalar() or 0
+    analyses = db.query(func.count(Analysis.id)).scalar() or 0
     topups = db.query(LedgerEntry).filter(LedgerEntry.kind == "topup").all()
     charges = db.query(LedgerEntry).filter(LedgerEntry.kind == "charge").all()
     llm_cost = (
-        db.query(func.coalesce(func.sum(GenerationLog.cost_est), 0.0)).scalar() or 0.0
+        db.query(func.coalesce(func.sum(Analysis.cost_est), 0.0)).scalar() or 0.0
     )
     recent = (
         db.query(User)
@@ -75,8 +72,8 @@ def admin_summary(
             "users": total_users,
             "verified_users": verified,
             "trial_used": trial_used,
-            "projects": projects,
-            "generated_pages": generated_pages,
+            "documents": documents,
+            "analyses": analyses,
             "topups_points": sum(e.amount for e in topups if e.amount > 0),
             "charges_points": abs(sum(e.amount for e in charges if e.amount < 0)),
             "estimated_llm_cost_usd": round(float(llm_cost), 6),

@@ -1,7 +1,27 @@
 # NotesBang — monorepo
 
-AI speaker notes generator. Product/business requirements live in
-[`docs/PRD.md`](docs/PRD.md). Operations guide: [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
+**NotesBang is now a content scoring & rewriting product** (pivoted from the
+original speaker-notes tool): paste or upload copy (.docx / .txt / .md, ≤3000
+chars), get a platform-aware scorecard (hook, title, rhythm, emotion, social
+currency, interaction) with evidence and suggestions, then a full rewrite plus
+title/hook variants. Free: 5 analyses/day. Bilingual UI (zh/en).
+
+- Requirements/history: [`docs/PRD.md`](docs/PRD.md) · Cost model: [`docs/COSTS.md`](docs/COSTS.md) · Payments: [`docs/PAYMENTS_STRATEGY.md`](docs/PAYMENTS_STRATEGY.md) · Ops: [`docs/RUNBOOK.md`](docs/RUNBOOK.md)
+
+## Routes
+- `/` landing · `/studio` the app · `/admin` ops console · `/terms`, `/privacy`
+- API: `/api/documents/*`, `/api/auth/*`, `/api/billing/*`, `/api/admin/*`
+
+## Content-scoring API
+1. `POST /api/documents` (paste) or `POST /api/documents/upload` (file) → parsed, capped, language-detected.
+2. `POST /api/documents/{id}/analyze` → scorecard (two-stage rubric scoring; evidence verified).
+3. `POST /api/documents/{id}/rewrite` `{kind: full|title|hook}` → rewrite + variants.
+4. `GET /api/documents/{id}/export?fmt=md|docx|txt` → scorecard + rewrite.
+5. `POST /api/documents/{id}/outcome` and `POST /api/documents/feedback` → corpus labels.
+
+Rubrics live in `backend/app/llm/rubrics/rubric_v1.yaml`; scoring is ordinal
+(1–5 bands) with the overall score computed in code. `backend/tests/test_golden_scoring.py`
+is the stability harness (set `RUN_GOLDEN=1` + key for the real-model run).
 
 ## Repository layout
 

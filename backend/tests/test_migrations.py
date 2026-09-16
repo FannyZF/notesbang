@@ -16,7 +16,16 @@ def test_alembic_upgrade_head(tmp_path: Path, monkeypatch):
 
     engine = create_engine(f"sqlite:///{db_file}")
     tables = set(inspect(engine).get_table_names())
-    assert {"users", "projects", "pages", "jobs", "wallets", "ledger_entries"} <= tables
+    assert {
+        "users",
+        "documents",
+        "analyses",
+        "dimension_scores",
+        "jobs",
+        "wallets",
+        "ledger_entries",
+        "daily_usage",
+    } <= tables
     assert "alembic_version" in tables
 
     # Idempotent re-run.

@@ -12,9 +12,6 @@ from app.api import (
     routes_auth,
     routes_billing,
     routes_documents,
-    routes_projects,
-    routes_speech,
-    routes_styles,
 )
 from app.core.config import get_settings
 from app.core.metrics import HTTP_LATENCY, HTTP_REQUESTS, render_metrics
@@ -71,10 +68,7 @@ async def observability_middleware(request: Request, call_next):
 
 API_PREFIX = "/api"
 app.include_router(routes_auth.router, prefix=API_PREFIX)
-app.include_router(routes_projects.router, prefix=API_PREFIX)
 app.include_router(routes_billing.router, prefix=API_PREFIX)
-app.include_router(routes_speech.router, prefix=API_PREFIX)
-app.include_router(routes_styles.router, prefix=API_PREFIX)
 app.include_router(routes_admin.router, prefix=API_PREFIX)
 app.include_router(routes_documents.router, prefix=API_PREFIX)
 

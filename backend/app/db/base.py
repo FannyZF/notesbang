@@ -84,20 +84,6 @@ def ensure_schema() -> None:
 
     # Back-fill NULLs introduced by additive columns.
     backfills = {
-        "projects": {
-            "note_mode": "script",
-            "style": "business",
-            "custom_scenario": "",
-            "audience": "General",
-            "persona": "I",
-            "output_lang": "auto",
-            "transitions": 1,
-            "data_fidelity": 1,
-            "speed_source": "default",
-            "quality_mode": "full",
-            "vision_enabled": 1,
-        },
-        "pages": {"note_mode": "script", "status": "parsed", "weight": 1.0},
         "jobs": {"phase": ""},
         "users": {"banned": 0, "notify_on_complete": 1, "locale": "en"},
     }
@@ -117,11 +103,7 @@ def ensure_schema() -> None:
                     )
 
     # Normalise legacy localized option values to canonical codes.
-    value_fixes = {
-        "projects": {
-            "output_lang": {"跟随": "auto", "中文": "zh", "英文": "en"},
-        }
-    }
+    value_fixes: dict = {}
     for table_name, columns in value_fixes.items():
         if not insp.has_table(table_name):
             continue

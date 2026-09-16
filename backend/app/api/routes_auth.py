@@ -196,39 +196,43 @@ def export_account_data(
 
     from fastapi import Response
 
-    from app.models import LedgerEntry, Page, Project, StyleProfile, StyleSample
+    from app.models import Analysis, DimensionScore, Document, LedgerEntry, Rewrite, StyleProfile, StyleSample
 
-    projects = db.query(Project).filter(Project.user_id == user.id).all()
+    docs = db.query(Document).filter(Document.user_id == user.id).all()
     payload = {
         "account": {
             "email": user.email,
             "plan_state": user.plan_state,
             "email_verified": user.email_verified,
+            "locale": user.locale,
             "created_at": user.created_at.isoformat() if user.created_at else None,
         },
-        "projects": [
+        "documents": [
             {
-                "title": p.title,
-                "source_format": p.source_format,
-                "target_minutes": p.target_minutes,
-                "note_mode": p.note_mode,
-                "style": p.style,
-                "custom_scenario": p.custom_scenario,
-                "output_lang": p.output_lang,
-                "pages": [
+                "title": d.title,
+                "platform": d.platform,
+                "char_count": d.char_count,
+                "content": d.content,
+                "consent_improve": d.consent_improve,
+                "analyses": [
                     {
-                        "ord": pg.ord,
-                        "raw_text": pg.raw_text,
-                        "note_text": pg.note_text,
-                        "note_mode": pg.note_mode,
+                        "overall_score": a.overall_score,
+                        "summary": a.summary,
+                        "dimensions": [
+                            {"key": s.key, "band": s.band, "score": s.score}
+                            for s in db.query(DimensionScore)
+                            .filter(DimensionScore.analysis_id == a.id)
+                            .all()
+                        ],
                     }
-                    for pg in db.query(Page)
-                    .filter(Page.project_id == p.id)
-                    .order_by(Page.ord)
-                    .all()
+                    for a in db.query(Analysis).filter(Analysis.document_id == d.id).all()
+                ],
+                "rewrites": [
+                    {"kind": r.kind, "content": r.content}
+                    for r in db.query(Rewrite).filter(Rewrite.document_id == d.id).all()
                 ],
             }
-            for p in projects
+            for d in docs
         ],
         "style_samples": [
             {"title": s.title, "text": s.text}
@@ -264,47 +268,43 @@ def delete_account(
 ):
     """Delete the account and all associated data (GDPR erasure)."""
     from app.models import (
-        GenerationLog,
-        Job,
+        Analysis,
+        CorpusFeature,
+        DimensionScore,
+        Document,
+        Feedback,
         LedgerEntry,
-        Page,
-        PageRevision,
-        Project,
-        Section,
+        Rewrite,
         StyleProfile,
         StyleSample,
         Subscription,
     )
-    from app.services.storage import get_storage
 
-    storage = get_storage()
-    projects = db.query(Project).filter(Project.user_id == user.id).all()
-    page_ids: list[int] = []
-    for project in projects:
-        storage.delete(project.source_key)
-        page_ids.extend(
+    doc_ids = [
+        row[0] for row in db.query(Document.id).filter(Document.user_id == user.id).all()
+    ]
+    if doc_ids:
+        analysis_ids = [
             row[0]
-            for row in db.query(Page.id).filter(Page.project_id == project.id).all()
-        )
-    if page_ids:
-        db.query(PageRevision).filter(PageRevision.page_id.in_(page_ids)).delete(
+            for row in db.query(Analysis.id).filter(Analysis.document_id.in_(doc_ids)).all()
+        ]
+        if analysis_ids:
+            db.query(DimensionScore).filter(
+                DimensionScore.analysis_id.in_(analysis_ids)
+            ).delete(synchronize_session=False)
+        db.query(Analysis).filter(Analysis.document_id.in_(doc_ids)).delete(
             synchronize_session=False
         )
-    project_ids = [p.id for p in projects]
-    if project_ids:
-        db.query(GenerationLog).filter(
-            GenerationLog.project_id.in_(project_ids)
-        ).delete(synchronize_session=False)
-        db.query(Job).filter(Job.project_id.in_(project_ids)).delete(
+        db.query(Rewrite).filter(Rewrite.document_id.in_(doc_ids)).delete(
             synchronize_session=False
         )
-        db.query(Section).filter(Section.project_id.in_(project_ids)).delete(
+        db.query(Feedback).filter(Feedback.document_id.in_(doc_ids)).delete(
             synchronize_session=False
         )
-        db.query(Page).filter(Page.project_id.in_(project_ids)).delete(
+        db.query(CorpusFeature).filter(CorpusFeature.document_id.in_(doc_ids)).delete(
             synchronize_session=False
         )
-        db.query(Project).filter(Project.id.in_(project_ids)).delete(
+        db.query(Document).filter(Document.id.in_(doc_ids)).delete(
             synchronize_session=False
         )
 

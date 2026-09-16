@@ -1,52 +1,47 @@
-"""GDPR export + retention cleanup tests."""
+"""GDPR export + retention cleanup tests (content-scoring product)."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
 from app.db.base import SessionLocal
-from app.models import Page, Project
+from app.models import Document
 from app.services.cleanup import cleanup_expired
-from tests.conftest import _auth, build_pptx, register_verified
+from tests.conftest import _auth, register_verified
 
-PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+SAMPLE = "我用3个月把粉丝从0做到1万，方法只有3步。你最常用哪一招？评论区告诉我。"
+
+
+def _make_doc(client, token):
+    return client.post(
+        "/api/documents",
+        headers=_auth(token),
+        json={"title": "增长", "content": SAMPLE, "platform": "xiaohongshu"},
+    ).json()
 
 
 def test_account_export(client):
     token, email = register_verified(client)
-    name, data = build_pptx(2)
-    client.post(
-        "/api/projects", headers=_auth(token),
-        files={"file": (name, data, PPTX_MIME)},
-    )
+    _make_doc(client, token)
     r = client.get("/api/auth/export", headers=_auth(token))
     assert r.status_code == 200
     assert "attachment" in r.headers.get("content-disposition", "")
     body = r.json()
     assert body["account"]["email"] == email
-    assert len(body["projects"]) == 1
-    assert body["projects"][0]["pages"]
+    assert len(body["documents"]) == 1
+    assert body["documents"][0]["content"]
 
 
-def test_retention_cleanup_purges_old_images(client):
+def test_retention_cleanup_purges_old_documents(client):
     token, _ = register_verified(client)
-    name, data = build_pptx(2)
-    up = client.post(
-        "/api/projects", headers=_auth(token),
-        files={"file": (name, data, PPTX_MIME)},
-    )
-    pid = up.json()["id"]
+    doc = _make_doc(client, token)
 
     db = SessionLocal()
     try:
-        project = db.get(Project, pid)
-        project.created_at = datetime.now(timezone.utc) - timedelta(days=90)
-        page = db.query(Page).filter(Page.project_id == pid).first()
-        page.image_key = "old/key.png"
+        row = db.get(Document, doc["id"])
+        row.created_at = datetime.now(timezone.utc) - timedelta(days=90)
         db.commit()
-
         result = cleanup_expired(db, ttl_days=30)
-        assert result["images"] >= 1
-        db.refresh(page)
-        assert page.image_key is None
+        assert result["documents"] >= 1
+        assert db.get(Document, doc["id"]) is None
     finally:
         db.close()

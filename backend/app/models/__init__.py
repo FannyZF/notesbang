@@ -96,106 +96,18 @@ class LedgerEntry(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
-class Project(Base):
-    __tablename__ = "projects"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
-    title: Mapped[str] = mapped_column(String(255))
-    source_format: Mapped[str] = mapped_column(String(16))  # pptx | pdf | ...
-    source_key: Mapped[str] = mapped_column(String(255))  # object storage key
-    status: Mapped[str] = mapped_column(String(20), default="uploaded")
-    # Generation settings (Phase 1 consumes these).
-    target_minutes: Mapped[int] = mapped_column(Integer, default=10)
-    note_mode: Mapped[str] = mapped_column(String(10), default="script")
-    # Generation settings (Phase 1).
-    style: Mapped[str] = mapped_column(String(32), default="business")
-    custom_scenario: Mapped[str] = mapped_column(Text, default="")
-    audience: Mapped[str] = mapped_column(String(255), default="通用")
-    persona: Mapped[str] = mapped_column(String(120), default="我/汇报人")
-    output_lang: Mapped[str] = mapped_column(String(32), default="跟随")
-    transitions: Mapped[bool] = mapped_column(Boolean, default=True)
-    data_fidelity: Mapped[bool] = mapped_column(Boolean, default=True)
-    speed_source: Mapped[str] = mapped_column(String(16), default="default")
-    speed_cps: Mapped[float | None] = mapped_column(Float, nullable=True)
-    quality_mode: Mapped[str] = mapped_column(String(16), default="full")  # full | fast
-    vision_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    style_profile_id: Mapped[int | None] = mapped_column(
-        ForeignKey("style_profiles.id"), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
-
-    pages: Mapped[list["Page"]] = relationship(
-        back_populates="project", cascade="all, delete-orphan", order_by="Page.ord"
-    )
-
-
-class Section(Base):
-    __tablename__ = "sections"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
-    name: Mapped[str] = mapped_column(String(120), default="未分节")
-    ord: Mapped[int] = mapped_column(Integer, default=0)
-
-
-class Page(Base):
-    __tablename__ = "pages"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
-    section_id: Mapped[int | None] = mapped_column(
-        ForeignKey("sections.id"), nullable=True
-    )
-    ord: Mapped[int] = mapped_column(Integer)
-    raw_text: Mapped[str] = mapped_column(Text, default="")
-    image_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    note_text: Mapped[str] = mapped_column(Text, default="")
-    note_mode: Mapped[str] = mapped_column(String(10), default="script")
-    weight: Mapped[float] = mapped_column(default=1.0)
-    target_chars: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    status: Mapped[str] = mapped_column(String(16), default="parsed")
-    version: Mapped[int] = mapped_column(Integer, default=1)  # optimistic lock
-
-    project: Mapped[Project] = relationship(back_populates="pages")
-
-
-class PageRevision(Base):
-    __tablename__ = "page_revisions"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    page_id: Mapped[int] = mapped_column(ForeignKey("pages.id"), index=True)
-    note_text: Mapped[str] = mapped_column(Text, default="")
-    actor: Mapped[str] = mapped_column(String(16), default="system")  # user|system
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
-
-
 class Job(Base):
     __tablename__ = "jobs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
-    type: Mapped[str] = mapped_column(String(24))  # parse|generate_*|export|...
+    project_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    type: Mapped[str] = mapped_column(String(24))
     target_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="queued")
     phase: Mapped[str] = mapped_column(String(64), default="")
     progress: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(String(500), nullable=True)
     charge_amount: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
-
-
-class GenerationLog(Base):
-    __tablename__ = "generation_logs"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
-    page_id: Mapped[int | None] = mapped_column(ForeignKey("pages.id"), nullable=True)
-    job_id: Mapped[int | None] = mapped_column(ForeignKey("jobs.id"), nullable=True)
-    model: Mapped[str] = mapped_column(String(64))
-    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
-    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
-    cost_est: Mapped[float] = mapped_column(default=0.0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 

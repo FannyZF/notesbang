@@ -9,10 +9,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_verified
 from app.db.base import get_db
 from app.models import (
-    GenerationLog,
     LedgerEntry,
     PricingConfig,
-    Project,
     Subscription,
     User,
     Wallet,
@@ -229,13 +227,13 @@ def usage_report(
     user: User = Depends(require_verified),
     db: Session = Depends(get_db),
 ):
-    project_ids = [
-        row[0]
-        for row in db.query(Project.id).filter(Project.user_id == user.id).all()
-    ]
-    logs = (
-        db.query(GenerationLog).filter(GenerationLog.project_id.in_(project_ids)).all()
-        if project_ids
+    from app.models import Analysis, Document
+
+    docs = db.query(Document).filter(Document.user_id == user.id).all()
+    doc_ids = [d.id for d in docs]
+    analyses = (
+        db.query(Analysis).filter(Analysis.document_id.in_(doc_ids)).all()
+        if doc_ids
         else []
     )
     entries = db.query(LedgerEntry).filter(LedgerEntry.user_id == user.id).all()
@@ -244,12 +242,12 @@ def usage_report(
     wallet = user.wallet
     return UsageReportOut(
         user_id=user.id,
-        generated_pages=len(logs),
-        generation_cost_usd=round(sum(l.cost_est for l in logs), 6),
+        generated_pages=len(analyses),
+        generation_cost_usd=round(sum(a.cost_est for a in analyses), 6),
         topups_points=topups,
         charges_points=charges,
         balance=wallet.balance if wallet else 0,
-        projects=len(project_ids),
+        projects=len(doc_ids),
     )
 
 

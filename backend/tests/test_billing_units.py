@@ -73,27 +73,6 @@ def test_record_charge_rejects_overdraw(client, paid_user_id):
         db.close()
 
 
-def test_task_settle_is_idempotent_across_retries(client, paid_user_id):
-    """A retried worker must not fail the job when the charge already exists."""
-    from app.workers import tasks
-
-    db, user = _session_for_user(paid_user_id)
-    try:
-        job = Job(project_id=1, type="generate_whole", status="queued")
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        tasks._settle(db, user, job, 1, "whole")
-        db.refresh(user.wallet)
-        assert user.wallet.balance == 9
-        # Simulated re-run of the same job after a crash between charge/success.
-        tasks._settle(db, user, job, 1, "whole")
-        db.refresh(user.wallet)
-        assert user.wallet.balance == 9
-    finally:
-        db.close()
-
-
 def test_counters_mixed_length():
     from app.core.counters import count_chars
 

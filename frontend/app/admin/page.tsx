@@ -8,8 +8,8 @@ type Totals = {
   users: number;
   verified_users: number;
   trial_used: number;
-  projects: number;
-  generated_pages: number;
+  documents: number;
+  analyses: number;
   topups_points: number;
   charges_points: number;
   estimated_llm_cost_usd: number;
@@ -109,8 +109,8 @@ export default function AdminPage() {
             { label: "Users", value: totals.users },
             { label: "Verified", value: totals.verified_users },
             { label: "Trial used", value: totals.trial_used },
-            { label: "Projects", value: totals.projects },
-            { label: "Generated pages", value: totals.generated_pages },
+            { label: "Documents", value: totals.documents },
+            { label: "Analyses", value: totals.analyses },
             { label: "Top-ups (pts)", value: totals.topups_points },
             { label: "Charged (pts)", value: totals.charges_points },
             { label: "Est. LLM cost ($)", value: totals.estimated_llm_cost_usd.toFixed(4) },
