@@ -57,6 +57,32 @@ class AdminBanIn(BaseModel):
     banned: bool
 
 
+# ---------- content scoring product ----------
+class DocumentPasteIn(BaseModel):
+    title: str = Field(default="", max_length=300)
+    content: str = Field(min_length=1)
+    platform: str = Field(default="auto", max_length=24)
+    consent_improve: bool = True
+
+
+class RewriteIn(BaseModel):
+    kind: str = Field(default="full", pattern="^(full|title|hook|section)$")
+    paragraph: str | None = None
+    issue: str | None = None
+
+
+class FeedbackIn(BaseModel):
+    document_id: int | None = None
+    analysis_id: int | None = None
+    target_type: str = Field(default="analysis", max_length=16)
+    target_ref: str = Field(default="", max_length=64)
+    action: str = Field(default="", max_length=24)
+
+
+class ConsentIn(BaseModel):
+    consent_improve: bool
+
+
 class LoginOut(BaseModel):
     token: str
     user_id: int

@@ -11,6 +11,7 @@ from app.api import (
     routes_admin,
     routes_auth,
     routes_billing,
+    routes_documents,
     routes_projects,
     routes_speech,
     routes_styles,
@@ -75,6 +76,7 @@ app.include_router(routes_billing.router, prefix=API_PREFIX)
 app.include_router(routes_speech.router, prefix=API_PREFIX)
 app.include_router(routes_styles.router, prefix=API_PREFIX)
 app.include_router(routes_admin.router, prefix=API_PREFIX)
+app.include_router(routes_documents.router, prefix=API_PREFIX)
 
 
 @app.get("/healthz", tags=["system"])

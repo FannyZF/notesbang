@@ -94,6 +94,13 @@ class Settings:
         )
         self.vision_max_pages = int(os.getenv("VISION_MAX_PAGES", "20"))
         self.retention_days = int(os.getenv("RETENTION_DAYS", "30"))
+        # Content-scoring product knobs.
+        self.content_max_chars = int(os.getenv("CONTENT_MAX_CHARS", "3000"))
+        self.free_daily_limit = int(os.getenv("FREE_DAILY_LIMIT", "5"))
+        self.rubric_version = os.getenv("RUBRIC_VERSION", "v1")
+        self.scoring_cache_enabled = os.getenv(
+            "SCORING_CACHE_ENABLED", "true"
+        ).lower() in ("1", "true", "yes")
         self.export_enabled = os.getenv("EXPORT_ENABLED", "false").lower() in (
             "1",
             "true",
