@@ -41,6 +41,7 @@ class User(Base):
     )  # chars/words per second (PRD §4.4)
     banned: Mapped[bool] = mapped_column(Boolean, default=False)
     notify_on_complete: Mapped[bool] = mapped_column(Boolean, default=True)
+    locale: Mapped[str] = mapped_column(String(8), default="en")  # en | zh
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     entitlement: Mapped["Entitlement"] = relationship(
@@ -269,3 +270,105 @@ class StyleProfile(Base):
     profile_json: Mapped[str] = mapped_column(Text, default="{}")
     sample_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+# ==================== Content scoring product (pivot) ====================
+
+
+class Document(Base):
+    __tablename__ = "documents"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    title: Mapped[str] = mapped_column(String(300), default="")
+    source_format: Mapped[str] = mapped_column(String(16), default="paste")  # docx|txt|md|paste
+    platform: Mapped[str] = mapped_column(String(24), default="auto")
+    content: Mapped[str] = mapped_column(Text, default="")
+    char_count: Mapped[int] = mapped_column(Integer, default=0)
+    language: Mapped[str] = mapped_column(String(8), default="")  # detected zh|en|...
+    consent_improve: Mapped[bool] = mapped_column(Boolean, default=True)
+    status: Mapped[str] = mapped_column(String(16), default="uploaded")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class Analysis(Base):
+    __tablename__ = "analyses"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), index=True)
+    rubric_version: Mapped[str] = mapped_column(String(32), default="v1")
+    platform: Mapped[str] = mapped_column(String(24), default="")
+    overall_score: Mapped[float] = mapped_column(default=0.0)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    model: Mapped[str] = mapped_column(String(64), default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_est: Mapped[float] = mapped_column(default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class DimensionScore(Base):
+    __tablename__ = "dimension_scores"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    analysis_id: Mapped[int] = mapped_column(ForeignKey("analyses.id"), index=True)
+    key: Mapped[str] = mapped_column(String(32))
+    label: Mapped[str] = mapped_column(String(120), default="")
+    band: Mapped[int] = mapped_column(Integer, default=0)  # 1..5
+    score: Mapped[int] = mapped_column(Integer, default=0)  # mapped from band
+    weight: Mapped[float] = mapped_column(default=0.0)
+    rationale: Mapped[str] = mapped_column(Text, default="")
+    evidence_json: Mapped[str] = mapped_column(Text, default="[]")
+    suggestions_json: Mapped[str] = mapped_column(Text, default="[]")
+
+
+class Rewrite(Base):
+    __tablename__ = "rewrites"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), index=True)
+    analysis_id: Mapped[int | None] = mapped_column(
+        ForeignKey("analyses.id"), nullable=True
+    )
+    kind: Mapped[str] = mapped_column(String(16), default="full")  # full|title|hook|section
+    content: Mapped[str] = mapped_column(Text, default="")
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class Feedback(Base):
+    __tablename__ = "feedback"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    document_id: Mapped[int | None] = mapped_column(
+        ForeignKey("documents.id"), nullable=True
+    )
+    analysis_id: Mapped[int | None] = mapped_column(
+        ForeignKey("analyses.id"), nullable=True
+    )
+    target_type: Mapped[str] = mapped_column(String(16), default="analysis")
+    target_ref: Mapped[str] = mapped_column(String(64), default="")
+    action: Mapped[str] = mapped_column(String(24), default="")  # accepted|rejected|useful|not_useful
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class CorpusFeature(Base):
+    __tablename__ = "corpus_features"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), index=True)
+    platform: Mapped[str] = mapped_column(String(24), default="")
+    features_json: Mapped[str] = mapped_column(Text, default="{}")
+    outcome_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class DailyUsage(Base):
+    __tablename__ = "daily_usage"
+    __table_args__ = (UniqueConstraint("user_id", "day", name="uq_daily_usage"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    day: Mapped[str] = mapped_column(String(10), index=True)  # YYYY-MM-DD (UTC)
+    count: Mapped[int] = mapped_column(Integer, default=0)
