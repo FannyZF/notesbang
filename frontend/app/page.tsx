@@ -1,344 +1,273 @@
+"use client";
+
 import Link from "next/link";
-import FeatureCarousel from "../components/FeatureCarousel";
+import LanguageSwitcher from "../components/LanguageSwitcher";
+import { useI18n } from "../lib/i18n";
 
-const features = [
-  {
-    title: "Made for the moment",
-    body: "Boardroom, classroom, keynote or a pitch on a deadline — the notes are shaped for the scenario you're actually in, never a one-size-fits-all script.",
-    mark: "B",
-  },
-  {
-    title: "Notes that fit your time",
-    body: "We measure your speaking pace first, then allocate a word budget per slide from your target duration. Your notes finish right on time.",
-    mark: "T",
-  },
-  {
-    title: "Your voice, preserved",
-    body: "Choose a style, describe your context — or upload past scripts and let the generator learn the way you talk.",
-    mark: "V",
-  },
-  {
-    title: "Full script ⇄ cue cards",
-    body: "Get a complete read-aloud script by default, or switch to bullet-style cue cards. Two formats, whichever fits how you present.",
-    mark: "C",
-  },
-  {
-    title: "Coherent across the deck",
-    body: "An outline pass runs first, then notes are generated section by section — pages reference each other naturally. Mark key slides to go deeper.",
-    mark: "L",
-  },
-  {
-    title: "Back into PowerPoint",
-    body: "Write notes into each slide's speaker notes, or export a Word/PDF script. Your original layout is never touched.",
-    mark: "P",
-  },
-];
+type Copy = {
+  nav: { features: string; how: string; faq: string; open: string };
+  hero: { badge: string; title1: string; title2: string; sub: string; cta: string; more: string };
+  mock: { title: string; platform: string; overall: string; dim: string; band: string; quote: string; suggestion: string };
+  features: { title: string; items: { t: string; b: string }[] };
+  how: { title: string; steps: { t: string; b: string }[]; cta: string };
+  free: { title: string; sub: string; bullets: string[] };
+  faq: { title: string; items: { q: string; a: string }[] };
+  cta: { title: string; sub: string; button: string };
+  footer: { tagline: string };
+};
 
-const steps = [
-  {
-    n: "01",
-    title: "Upload your deck",
-    body: "Bring your slides (PPTX and slide-style PDF). We extract every page and let you confirm sections and flag key slides before anything is written.",
+const COPY: Record<"en" | "zh", Copy> = {
+  en: {
+    nav: { features: "Features", how: "How it works", faq: "FAQ", open: "Open Studio" },
+    hero: {
+      badge: "Content scoring & rewriting, made for your platform",
+      title1: "Paste your copy.",
+      title2: "See exactly why it works — or doesn't.",
+      sub: "Score your article or note across hook, rhythm, emotion, social currency and more, with evidence from your own text. Then rewrite it — full version plus title and opening options.",
+      cta: "Start free →",
+      more: "See how it works",
+    },
+    mock: {
+      title: "Scorecard",
+      platform: "Xiaohongshu",
+      overall: "Overall",
+      dim: "Hook strength",
+      band: "Band 3/5",
+      quote: "I grew from 0 to 10k followers in 3 months…",
+      suggestion: "Lead with the outcome before the backstory.",
+    },
+    features: {
+      title: "Scoring you can trust, rewriting you can ship.",
+      items: [
+        { t: "Platform rubrics", b: "Xiaohongshu, WeChat, LinkedIn, X and Blog each get their own weights and norms." },
+        { t: "Evidence-based scores", b: "Every score cites exact lines from your copy, so you see the reason — not just a number." },
+        { t: "Actionable suggestions", b: "Issue → fix → a ready-to-paste example for each dimension." },
+        { t: "Full rewrite + variants", b: "Get a rewritten piece plus 5 titles and 3 opening hooks." },
+        { t: "Export anywhere", b: "Download the scorecard and rewrite as Markdown, Word or plain text." },
+        { t: "Free to start", b: "5 analyses per day, up to 3000 characters each. No card needed." },
+      ],
+    },
+    how: {
+      title: "From draft to ready, in three steps.",
+      steps: [
+        { t: "Paste or upload", b: "Paste text or upload .docx / .txt / .md and pick the platform you publish on." },
+        { t: "Get your scorecard", b: "See band-by-band scores with evidence and concrete fixes." },
+        { t: "Rewrite & export", b: "Apply a full rewrite with title and hook options, then export." },
+      ],
+      cta: "Score your first piece",
+    },
+    free: {
+      title: "Free during early access.",
+      sub: "Help us learn what makes copy work — and get your analysis free.",
+      bullets: [
+        "5 analyses per day, up to 3000 characters each",
+        "No credit card required",
+        "Your copy is used (anonymized) to improve the service — you can opt out anytime",
+      ],
+    },
+    faq: {
+      title: "Frequently asked questions",
+      items: [
+        { q: "Which formats can I upload?", a: "Paste plain text, or upload .docx, .txt or .md. Each piece is capped at 3000 characters to keep scoring fast and free." },
+        { q: "How is the score computed?", a: "Each dimension is rated on a 1–5 band using a platform-specific rubric, and the overall score is the weighted average computed by our system — not guessed by the model." },
+        { q: "Is there an 'AI probability' score?", a: "No. AI-text detection is unreliable, so we removed it. Instead we score things you can act on: hook, title, rhythm, emotion, social currency and interaction." },
+        { q: "Will you use my copy?", a: "By default your anonymized copy helps us learn what works; you can turn this off per document or any time. See the Privacy Policy." },
+        { q: "Does it work in Chinese and English?", a: "Yes — the UI and the scoring support both, and the output follows your copy's language." },
+        { q: "Is it really free?", a: "Yes, during early access: 5 analyses per day per account, no card required." },
+      ],
+    },
+    cta: { title: "Your next piece deserves a second pair of eyes.", sub: "Score it free, see the reasons, ship a better version.", button: "Open Studio" },
+    footer: { tagline: "NotesBang · content scoring & rewriting" },
   },
-  {
-    n: "02",
-    title: "Set the scene and duration",
-    body: "Pick a style that matches your moment, describe the audience, and set your time limit. Read a short sample aloud to calibrate your pace — or skip it.",
+  zh: {
+    nav: { features: "功能", how: "流程", faq: "常见问题", open: "打开工作台" },
+    hero: {
+      badge: "为你的发布平台而做的文案评分与改写",
+      title1: "粘贴你的文案。",
+      title2: "看清它为什么行 —— 或不行。",
+      sub: "从首屏钩子、推进节奏、情绪共鸣、社交货币等多个维度打分，并引用你自己的原文作为证据；再给出整篇改写，以及标题与开头的多个备选。",
+      cta: "免费开始 →",
+      more: "看看怎么用",
+    },
+    mock: {
+      title: "评分卡",
+      platform: "小红书",
+      overall: "总分",
+      dim: "首屏钩子穿透力",
+      band: "档位 3/5",
+      quote: "我用3个月把粉丝从0做到1万……",
+      suggestion: "先给结论，再讲背景。",
+    },
+    features: {
+      title: "可信的评分，能用的改写。",
+      items: [
+        { t: "平台化 Rubric", b: "小红书、公众号、LinkedIn、X、博客各有独立的权重与规范。" },
+        { t: "有证据的评分", b: "每一分都引用你的原文原句，看到的是理由，而不只是数字。" },
+        { t: "可执行的建议", b: "每个维度给出：问题 → 怎么改 → 可直接粘贴的示例。" },
+        { t: "整篇改写 + 多版本", b: "一篇改写稿，外加 5 个标题与 3 个开头备选。" },
+        { t: "随手导出", b: "评分卡与改写稿可导出 Markdown、Word 或纯文本。" },
+        { t: "免费开始", b: "每天 5 次分析，单篇不超过 3000 字，无需绑卡。" },
+      ],
+    },
+    how: {
+      title: "三步，从草稿到可用。",
+      steps: [
+        { t: "粘贴或上传", b: "粘贴文本，或上传 .docx / .txt / .md，并选择你要发布的平台。" },
+        { t: "拿到评分卡", b: "逐维度查看档位、原文证据与具体修改建议。" },
+        { t: "改写与导出", b: "应用整篇改写（含标题/开头备选），然后导出。" },
+      ],
+      cta: "分析你的第一篇文案",
+    },
+    free: {
+      title: "早期体验期，完全免费。",
+      sub: "帮我们一起摸清“什么样的文案有效”，你的分析免费。",
+      bullets: [
+        "每天 5 次分析，单篇不超过 3000 字",
+        "无需绑定信用卡",
+        "你的文案会以匿名方式用于改进服务，可随时关闭",
+      ],
+    },
+    faq: {
+      title: "常见问题",
+      items: [
+        { q: "支持哪些格式？", a: "可直接粘贴文本，或上传 .docx、.txt、.md。单篇上限 3000 字，以保证快速与免费。" },
+        { q: "分数是怎么算的？", a: "每个维度按 1–5 档评分（平台专属 Rubric），总分由系统按权重计算得出，而不是让模型随意给分。" },
+        { q: "为什么没有“AI 撰写概率”？", a: "AI 文本检测并不可靠，所以去掉了。我们只评你可以改进的维度：钩子、标题、节奏、情绪、社交货币与互动。" },
+        { q: "会用我的文案吗？", a: "默认会以匿名方式用于改进服务，你可以对单篇或随时关闭。详见隐私政策。" },
+        { q: "中英文都支持吗？", a: "支持——界面与评分都兼容中英文，输出语言跟随你的文案。" },
+        { q: "真的免费吗？", a: "早期体验期免费：每账号每天 5 次分析，无需绑卡。" },
+      ],
+    },
+    cta: { title: "你的下一篇文案，值得再被看一遍。", sub: "免费评分，看清理由，交付更好的版本。", button: "打开工作台" },
+    footer: { tagline: "NotesBang · 文案评分与改写" },
   },
-  {
-    n: "03",
-    title: "Generate, polish, export",
-    body: "Notes are written page by page as one coherent flow. Regenerate a single slide, edit freely, then export back to PPTX or as a script.",
-  },
-];
-
-const pricing = [
-  { points: 2, usd: 0, per: 0, note: "Preview one small deck, free", free: true },
-  { points: 10, usd: 5, per: 0.5, note: "Try a couple of short decks" },
-  { points: 20, usd: 10, per: 0.5, note: "Great for a few talks" },
-  { points: 200, usd: 95, per: 0.475, note: "Most popular", featured: true },
-  { points: 500, usd: 230, per: 0.46, note: "For frequent presenters" },
-];
-
-const faqs = [
-  {
-    q: "How does per-slide pricing work?",
-    a: "One point = one generated slide ($0.50 at the base rate). Buy points in packs ($5 for 10, $10 for 20, $95 for 200, $230 for 500). Every account can preview one deck of up to two slides free, and only the slides you actually generate consume points — exports and edits never cost extra.",
-  },
-  {
-    q: "Which file formats are supported?",
-    a: "The MVP supports .pptx and slide-style PDFs (16:9 / 4:3 pages). Legacy .ppt, Word documents and text-style PDFs are not supported yet and are under evaluation.",
-  },
-  {
-    q: "How much does it cost? Can I try it for free?",
-    a: "After registering and verifying your email, each account gets a one-time trial: upload a deck of up to two slides and experience the full generation flow. Trial results can be previewed freely but cannot be exported until you top up, which also unlocks larger files.",
-  },
-  {
-    q: "Do you generate full scripts or bullet points?",
-    a: "Both. By default we produce a complete, read-aloud script; one click switches a page (or the whole deck) to concise cue-card style. Both honor your target duration.",
-  },
-  {
-    q: "How do you make sure I finish on time?",
-    a: "Read a short fixed sample so we can measure your real pace (or enter one manually / use the default). We compute a total word budget from pace × duration, allocate it per slide, and verify lengths after generation.",
-  },
-  {
-    q: "Which languages are supported?",
-    a: "Output language follows the document by default and can be overridden to Chinese, English, or another target language in the settings.",
-  },
-  {
-    q: "What happens to my content?",
-    a: "To write notes, your document content is sent to a third-party model (e.g. DeepSeek). Source files are only used for parsing and display, and you can delete projects at any time. See our privacy and data-handling policy inside the product.",
-  },
-  {
-    q: "How do I make it sound more like me?",
-    a: "In “My styles”, upload a few of your past scripts. We automatically extract your tone, sentence rhythm and structure, and reuse it on later generations. Samples belong to you and can be deleted anytime.",
-  },
-  {
-    q: "Can I use it on my phone?",
-    a: "Upload and editing work best in a desktop browser. Voice pacing requires browser recording support (Safari 16.4+); on mobile it gracefully falls back to manual pace entry.",
-  },
-];
+};
 
 export default function Landing() {
+  const { locale } = useI18n();
+  const c = COPY[locale] ?? COPY.en;
+
   return (
     <main className="min-h-full bg-white font-sans text-zinc-900 antialiased">
-      {/* Nav */}
       <header className="sticky top-0 z-20 border-b border-black/5 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-6">
           <a href="#top" className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-zinc-800 to-zinc-950 text-sm font-bold text-white">
-              NB
-            </span>
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-zinc-800 to-zinc-950 text-sm font-bold text-white">NB</span>
             NotesBang
           </a>
           <nav className="hidden items-center gap-6 text-sm text-zinc-500 md:flex">
-            <a href="#features" className="transition hover:text-zinc-900">Features</a>
-            <a href="#how" className="transition hover:text-zinc-900">How it works</a>
-            <a href="#pricing" className="transition hover:text-zinc-900">Pricing</a>
-            <a href="#faq" className="transition hover:text-zinc-900">FAQ</a>
+            <a href="#features" className="transition hover:text-zinc-900">{c.nav.features}</a>
+            <a href="#how" className="transition hover:text-zinc-900">{c.nav.how}</a>
+            <a href="#faq" className="transition hover:text-zinc-900">{c.nav.faq}</a>
           </nav>
-          <Link
-            href="/app"
-            className="rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-zinc-700"
-          >
-            Open the app
-          </Link>
+          <div className="flex items-center gap-3">
+            <LanguageSwitcher />
+            <Link href="/studio" className="rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-zinc-700">
+              {c.nav.open}
+            </Link>
+          </div>
         </div>
       </header>
 
-      {/* Hero */}
       <section id="top" className="relative overflow-hidden bg-gradient-to-b from-zinc-50 to-white">
         <div className="mx-auto flex max-w-4xl flex-col items-center px-6 pt-24 text-center sm:pt-32">
           <span className="rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-[13px] font-medium tracking-wide text-zinc-500">
-            Tailor-made notes for your very moment
+            {c.hero.badge}
           </span>
           <h1 className="mt-6 max-w-3xl text-4xl font-semibold leading-tight tracking-tight text-balance sm:text-6xl sm:leading-[1.05]">
-            Upload your slides.
+            {c.hero.title1}
             <br />
-            Get a script built for this talk.
+            {c.hero.title2}
           </h1>
-          <p className="mt-6 max-w-2xl text-lg leading-relaxed text-zinc-500">
-            Turning every page of your presentation into speaker notes matched to
-            your pace, your time limit and your style — tuned to the moment and the
-            audience you are speaking to, not a recycled template.
-          </p>
+          <p className="mt-6 max-w-2xl text-lg leading-relaxed text-zinc-500">{c.hero.sub}</p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/app"
-              className="rounded-full bg-zinc-900 px-7 py-3 text-[15px] font-medium text-white shadow-sm transition hover:bg-zinc-700"
-            >
-              Start your free trial →
+            <Link href="/studio" className="rounded-full bg-zinc-900 px-7 py-3 text-[15px] font-medium text-white shadow-sm transition hover:bg-zinc-700">
+              {c.hero.cta}
             </Link>
-            <a
-              href="#features"
-              className="rounded-full border border-zinc-300 bg-white px-7 py-3 text-[15px] font-medium text-zinc-700 transition hover:bg-zinc-50"
-            >
-              See what it does
+            <a href="#how" className="rounded-full border border-zinc-300 bg-white px-7 py-3 text-[15px] font-medium text-zinc-700 transition hover:bg-zinc-50">
+              {c.hero.more}
             </a>
           </div>
         </div>
 
-        {/* Product mock — bigger, clearer */}
         <div className="mx-auto mt-16 w-full max-w-5xl px-6 pb-24">
-          <div className="relative mx-auto overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-[0_40px_80px_-40px_rgba(0,0,0,0.3)]">
-            <div className="flex flex-col gap-1 border-b border-zinc-100 px-7 py-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-[15px] font-medium">Notes preview</p>
-                <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-xs text-zinc-500">
-                  <span><b className="font-medium text-zinc-400">Style:</b> Business</span>
-                  <span><b className="font-medium text-zinc-400">Notes mode:</b> Full script</span>
-                  <span><b className="font-medium text-zinc-400">Time limit:</b> 10 min</span>
-                  <span><b className="font-medium text-zinc-400">Pace:</b> yours</span>
-                </div>
-              </div>
-              <span className="mt-2 shrink-0 self-start rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-600 sm:mt-0 sm:self-auto">
-                Estimated ~9.7 min
-              </span>
+          <div className="relative mx-auto max-w-3xl rounded-[28px] border border-zinc-200/80 bg-white p-8 shadow-[0_40px_80px_-40px_rgba(0,0,0,0.3)]">
+            <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
+              <p className="text-sm font-medium">{c.mock.title}</p>
+              <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs text-zinc-500">{c.mock.platform}</span>
             </div>
-
-            <div className="grid gap-5 px-7 py-6 sm:grid-cols-2">
+            <div className="mt-5 grid gap-5 sm:grid-cols-2">
+              <div className="rounded-2xl bg-zinc-900 p-5 text-white">
+                <p className="text-xs text-zinc-400">{c.mock.overall}</p>
+                <p className="mt-1 text-3xl font-semibold">78/100</p>
+              </div>
               <div className="rounded-2xl bg-zinc-50 p-5">
-                <p className="text-xs font-medium text-zinc-400">Slide 1 · Opening</p>
-                <p className="mt-3 text-[15px] leading-relaxed text-zinc-700">
-                  Hi everyone — in the next ten minutes I'll show you how we turn a deck into a talk
-                  you can actually give. Let's start with a problem you've all felt.
-                </p>
+                <p className="text-xs text-zinc-400">{c.mock.dim} · {c.mock.band}</p>
+                <p className="mt-2 text-sm text-zinc-600">“{c.mock.quote}”</p>
+                <p className="mt-2 text-xs text-zinc-500">→ {c.mock.suggestion}</p>
               </div>
-              <div className="rounded-2xl bg-zinc-900 p-5">
-                <p className="text-xs font-medium text-zinc-500">Slide 3 · Data (key slide)</p>
-                <p className="mt-3 text-[15px] leading-relaxed text-zinc-200">
-                  72% of presenters start the night before. That number is from our internal survey —
-                  <span className="font-medium text-white"> [slow down] </span>
-                  and it tells us this tool isn't a luxury.
-                </p>
-              </div>
-            </div>
-
-            {/* Capabilities — the “what you can do” band */}
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-2 border-t border-zinc-100 bg-zinc-50/70 px-7 py-4">
-              <span className="mr-1 text-xs font-medium uppercase tracking-wide text-zinc-400">
-                What you can do with the result
-              </span>
-              {["Regenerate a slide", "Switch to cue cards", "Write back to PPTX", "Export Word", "Export PDF"].map(
-                (cap) => (
-                  <span
-                    key={cap}
-                    className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600"
-                  >
-                    {cap}
-                  </span>
-                )
-              )}
             </div>
           </div>
         </div>
       </section>
 
-      {/* Features — horizontal, swipeable */}
       <section id="features" className="border-t border-black/5 bg-white py-24">
         <div className="mx-auto max-w-6xl px-6">
-          <p className="text-center text-sm font-medium uppercase tracking-widest text-zinc-400">
-            Features
-          </p>
-          <h2 className="mx-auto mt-3 max-w-2xl text-center text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-            Preparing a talk, made fast and personal.
-          </h2>
-        </div>
-        <FeatureCarousel items={features} />
-      </section>
-
-      {/* How it works — steps zoom on hover */}
-      <section id="how" className="border-t border-black/5 bg-zinc-50 py-24">
-        <div className="mx-auto max-w-6xl px-6">
-          <p className="text-center text-sm font-medium uppercase tracking-widest text-zinc-400">
-            Three steps
-          </p>
-          <h2 className="mx-auto mt-3 max-w-2xl text-center text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-            From upload to on stage, in three steps.
-          </h2>
-          <div className="mt-16 grid gap-6 md:grid-cols-3">
-            {steps.map((s) => (
-              <div
-                key={s.n}
-                className="group cursor-default rounded-3xl border border-black/5 bg-white p-8 transition duration-300 ease-out hover:-translate-y-2 hover:scale-[1.03] hover:border-zinc-300 hover:shadow-[0_30px_60px_-30px_rgba(0,0,0,0.3)]"
-              >
-                <p className="font-mono text-2xl font-semibold text-zinc-200 transition duration-300 group-hover:text-zinc-800">
-                  {s.n}
-                </p>
-                <h3 className="mt-4 text-xl font-semibold tracking-tight">{s.title}</h3>
-                <p className="mt-3 text-[15px] leading-relaxed text-zinc-500 transition duration-300 group-hover:text-zinc-700">
-                  {s.body}
-                </p>
+          <h2 className="mx-auto max-w-2xl text-center text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{c.features.title}</h2>
+          <div className="mt-14 grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
+            {c.features.items.map((f) => (
+              <div key={f.t}>
+                <h3 className="text-lg font-semibold tracking-tight">{f.t}</h3>
+                <p className="mt-2 text-[15px] leading-relaxed text-zinc-500">{f.b}</p>
               </div>
             ))}
           </div>
-          <div className="mt-14 text-center">
-            <Link
-              href="/app"
-              className="inline-flex items-center justify-center rounded-full bg-zinc-900 px-7 py-3 text-[15px] font-medium text-white transition hover:bg-zinc-700"
-            >
-              Generate your first script
+        </div>
+      </section>
+
+      <section id="how" className="border-t border-black/5 bg-zinc-50 py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <h2 className="mx-auto max-w-2xl text-center text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{c.how.title}</h2>
+          <div className="mt-14 grid gap-6 md:grid-cols-3">
+            {c.how.steps.map((s, i) => (
+              <div key={s.t} className="rounded-3xl border border-black/5 bg-white p-7 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
+                <p className="font-mono text-2xl font-semibold text-zinc-200">{String(i + 1).padStart(2, "0")}</p>
+                <h3 className="mt-4 text-xl font-semibold tracking-tight">{s.t}</h3>
+                <p className="mt-3 text-[15px] leading-relaxed text-zinc-500">{s.b}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-12 text-center">
+            <Link href="/studio" className="inline-flex items-center justify-center rounded-full bg-zinc-900 px-7 py-3 text-[15px] font-medium text-white transition hover:bg-zinc-700">
+              {c.how.cta}
             </Link>
           </div>
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="border-t border-black/5 bg-white py-24">
-        <div className="mx-auto max-w-6xl px-6">
-          <p className="text-center text-sm font-medium uppercase tracking-widest text-zinc-400">
-            Pricing
-          </p>
-          <h2 className="mx-auto mt-3 max-w-2xl text-center text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-            Simple, per-slide pricing.
-          </h2>
-          <p className="mx-auto mt-3 max-w-xl text-center text-[15px] text-zinc-500">
-            One point per generated slide. Buy points when you need them — no subscription, no
-            surprises. You only pay for slides you actually generate.
-          </p>
-          <div className="mt-12 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-            {pricing.map((p) =>
-              p.free ? (
-                <div
-                  key="free"
-                  className="flex flex-col rounded-3xl border border-dashed border-zinc-300 bg-zinc-50/60 p-6"
-                >
-                  <p className="text-sm font-medium text-zinc-500">Free preview</p>
-                  <p className="mt-2 text-4xl font-semibold tracking-tight">$0</p>
-                  <p className="mt-1 text-xs text-zinc-400">2 slides · no card needed</p>
-                  <a
-                    href="/app"
-                    className="mt-5 rounded-full border border-zinc-300 px-4 py-2 text-center text-sm font-medium text-zinc-700 transition hover:bg-white"
-                  >
-                    Try it
-                  </a>
-                </div>
-              ) : (
-                <div
-                  key={p.points}
-                  className={`relative flex flex-col rounded-3xl border p-6 transition hover:-translate-y-1 hover:shadow-[0_30px_60px_-40px_rgba(0,0,0,0.3)] ${
-                    p.featured ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-200/80 bg-white"
-                  }`}
-                >
-                  {p.featured && (
-                    <span className="absolute -top-3 left-6 rounded-full bg-white px-3 py-0.5 text-[11px] font-semibold text-zinc-900">
-                      Popular
-                    </span>
-                  )}
-                  <p className={`text-sm font-medium ${p.featured ? "text-zinc-300" : "text-zinc-500"}`}>
-                    {p.points} points
-                  </p>
-                  <p className="mt-2 text-4xl font-semibold tracking-tight">${p.usd}</p>
-                  <p className="mt-1 text-xs text-zinc-400">≈ ${p.per}/slide · {p.note}</p>
-                  <a
-                    href="/app"
-                    className={`mt-5 rounded-full px-4 py-2 text-center text-sm font-medium transition ${
-                      p.featured ? "bg-white text-zinc-900 hover:bg-zinc-100" : "bg-zinc-900 text-white hover:bg-zinc-700"
-                    }`}
-                  >
-                    Buy points
-                  </a>
-                </div>
-              )
-            )}
-          </div>
-          <p className="mt-8 text-center text-xs text-zinc-400">
-            Every account can preview one deck of up to two slides free before buying anything.
-          </p>
+      <section id="free" className="border-t border-black/5 bg-white py-24">
+        <div className="mx-auto max-w-3xl px-6 text-center">
+          <h2 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{c.free.title}</h2>
+          <p className="mt-3 text-zinc-500">{c.free.sub}</p>
+          <ul className="mx-auto mt-8 flex max-w-md flex-col gap-2 text-left text-[15px] text-zinc-600">
+            {c.free.bullets.map((b) => (
+              <li key={b} className="flex items-center gap-2">
+                <span className="text-emerald-500">✓</span>
+                {b}
+              </li>
+            ))}
+          </ul>
+          <Link href="/studio" className="mt-8 inline-flex items-center justify-center rounded-full bg-zinc-900 px-7 py-3 text-[15px] font-medium text-white transition hover:bg-zinc-700">
+            {c.nav.open}
+          </Link>
         </div>
       </section>
 
-      {/* FAQ */}
       <section id="faq" className="border-t border-black/5 bg-white py-24">
         <div className="mx-auto max-w-3xl px-6">
-          <h2 className="text-center text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-            Frequently asked questions
-          </h2>
-          <p className="mt-3 text-center text-zinc-500">
-            Something else on your mind? Reach out from inside the app.
-          </p>
+          <h2 className="text-center text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{c.faq.title}</h2>
           <div className="mt-10 divide-y divide-zinc-100 border-y border-zinc-100">
-            {faqs.map((item) => (
+            {c.faq.items.map((item) => (
               <details key={item.q} className="group py-5">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[15px] font-medium text-zinc-900 [&::-webkit-details-marker]:hidden">
                   {item.q}
@@ -351,30 +280,21 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Final CTA */}
       <section className="bg-zinc-950 py-20 text-center text-white">
-        <h2 className="mx-auto max-w-2xl px-6 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-          Stop writing scripts the night before.
-        </h2>
-        <p className="mx-auto mt-4 max-w-xl px-6 text-zinc-400">
-          Upload up to two slides free and see the notes written for your moment.
-        </p>
-        <Link
-          href="/app"
-          className="mt-8 inline-flex items-center justify-center rounded-full bg-white px-7 py-3 text-[15px] font-medium text-zinc-900 transition hover:bg-zinc-200"
-        >
-          Start your free trial
+        <h2 className="mx-auto max-w-2xl px-6 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{c.cta.title}</h2>
+        <p className="mx-auto mt-4 max-w-xl px-6 text-zinc-400">{c.cta.sub}</p>
+        <Link href="/studio" className="mt-8 inline-flex items-center justify-center rounded-full bg-white px-7 py-3 text-[15px] font-medium text-zinc-900 transition hover:bg-zinc-200">
+          {c.cta.button}
         </Link>
       </section>
 
       <footer className="bg-zinc-950 pb-10 pt-2 text-sm text-zinc-500">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 sm:flex-row">
-          <p>NotesBang · tailor-made speaker notes for your moment</p>
+          <p>{c.footer.tagline}</p>
           <nav className="flex items-center gap-4 text-xs text-zinc-600">
-            <a href="#pricing" className="transition hover:text-zinc-300">Pricing</a>
-            <a href="/terms" className="transition hover:text-zinc-300">Terms of use</a>
+            <a href="/studio" className="transition hover:text-zinc-300">Studio</a>
+            <a href="/terms" className="transition hover:text-zinc-300">Terms</a>
             <a href="/privacy" className="transition hover:text-zinc-300">Privacy</a>
-            <a href="#faq" className="transition hover:text-zinc-300">FAQ</a>
           </nav>
         </div>
       </footer>

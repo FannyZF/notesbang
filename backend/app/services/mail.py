@@ -1,4 +1,4 @@
-"""Mail delivery with HTML templates.
+"""Mail delivery with bilingual (en/zh) HTML templates.
 
 - "console": prints the link (dev direct-through) and returns it.
 - "smtp": sends multipart (plain + HTML) email via SMTP STARTTLS.
@@ -12,6 +12,31 @@ from email.mime.text import MIMEText
 from email.utils import formataddr
 
 from app.core.config import Settings
+
+_COPY = {
+    "verify": {
+        "en": ("Confirm your NotesBang account", "Confirm your email", "Confirm email",
+               "Welcome to NotesBang — confirm your email address to start scoring and rewriting your copy."),
+        "zh": ("确认你的 NotesBang 账号", "确认邮箱", "确认邮箱",
+               "欢迎使用 NotesBang —— 请确认邮箱，开始为你的文案评分与改写。"),
+    },
+    "reset": {
+        "en": ("Reset your NotesBang password", "Reset your password", "Set new password",
+               "We received a request to reset your password. Choose a new one below."),
+        "zh": ("重置你的 NotesBang 密码", "重置密码", "设置新密码",
+               "我们收到了重置密码的请求，请在下方设置新密码。"),
+    },
+    "ready": {
+        "en": ("Your report is ready", "Your report is ready", "Open NotesBang",
+               "Your copy analysis is ready. Open it and give it a final read."),
+        "zh": ("你的报告已就绪", "报告已就绪", "打开 NotesBang",
+               "你的文案分析已完成，打开查看并做最后润色。"),
+    },
+}
+
+
+def _loc(locale: str | None) -> str:
+    return "zh" if (locale or "").lower().startswith("zh") else "en"
 
 
 def _html(title: str, body: str, cta: str, url: str) -> str:
@@ -29,9 +54,7 @@ def _html(title: str, body: str, cta: str, url: str) -> str:
 </div>"""
 
 
-def _send_smtp(
-    settings: Settings, to_email: str, subject: str, text: str, html: str
-) -> None:
+def _send_smtp(settings: Settings, to_email: str, subject: str, text: str, html: str) -> None:
     if not settings.smtp_host or not settings.smtp_from:
         raise RuntimeError("SMTP_HOST / SMTP_FROM not configured")
     msg = MIMEMultipart("alternative")
@@ -40,7 +63,6 @@ def _send_smtp(
     msg["To"] = to_email
     msg.attach(MIMEText(text, "plain", "utf-8"))
     msg.attach(MIMEText(html, "html", "utf-8"))
-
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as server:
         server.ehlo()
         if settings.smtp_use_tls:
@@ -51,76 +73,43 @@ def _send_smtp(
         server.sendmail(settings.smtp_from, [to_email], msg.as_string())
 
 
-def send_verification_link(settings: Settings, email: str, token: str) -> str | None:
-    url = f"{settings.app_base_url}/verify?token={token}"
-    driver = settings.mail_driver
-    if driver == "console":
-        print(f"[console-mail] to={email} verify={url}", flush=True)
+def _send(
+    settings: Settings, email: str, token: str, kind: str, path: str, locale: str | None
+) -> str | None:
+    lang = _loc(locale)
+    subject, title, cta, body = _COPY[kind][lang]
+    url = f"{settings.app_base_url}{path}?token={token}"
+    if settings.mail_driver == "console":
+        print(f"[console-mail] to={email} {kind}={url} lang={lang}", flush=True)
         return url
-    if driver == "smtp":
-        text = (
-            "Welcome to NotesBang!\n\n"
-            "Please confirm your email address to start creating speaker notes:\n"
-            f"{url}\n\nThis link expires soon."
-        )
-        html = _html(
-            "Confirm your email",
-            "Welcome to NotesBang — confirm your email address to start creating "
-            "speaker notes.",
-            "Confirm email",
-            url,
-        )
-        _send_smtp(settings, email, "Confirm your NotesBang account", text, html)
+    if settings.mail_driver == "smtp":
+        text = f"{body}\n\n{url}"
+        _send_smtp(settings, email, subject, text, _html(title, body, cta, url))
         return None
-    raise NotImplementedError(f"mail driver '{driver}' not implemented")
+    raise NotImplementedError(f"mail driver '{settings.mail_driver}' not implemented")
 
 
-def send_reset_link(settings: Settings, email: str, token: str) -> str | None:
-    url = f"{settings.app_base_url}/reset?token={token}"
-    driver = settings.mail_driver
-    if driver == "console":
-        print(f"[console-mail] to={email} reset={url}", flush=True)
-        return url
-    if driver == "smtp":
-        text = (
-            "We received a request to reset your NotesBang password.\n\n"
-            f"Set a new password here:\n{url}\n\nIf you did not ask, ignore this email."
-        )
-        html = _html(
-            "Reset your password",
-            "We received a request to reset your NotesBang password. Choose a new "
-            "one below. If you did not ask, you can ignore this email.",
-            "Set new password",
-            url,
-        )
-        _send_smtp(settings, email, "Reset your NotesBang password", text, html)
-        return None
-    raise NotImplementedError(f"mail driver '{driver}' not implemented")
+def send_verification_link(
+    settings: Settings, email: str, token: str, locale: str | None = "en"
+) -> str | None:
+    return _send(settings, email, token, "verify", "/verify", locale)
+
+
+def send_reset_link(
+    settings: Settings, email: str, token: str, locale: str | None = "en"
+) -> str | None:
+    return _send(settings, email, token, "reset", "/reset", locale)
 
 
 def send_generation_ready(
-    settings: Settings, email: str, project_title: str
+    settings: Settings, email: str, project_title: str, locale: str | None = "en"
 ) -> None:
-    """Best-effort "your notes are ready" notification (no-op if misconfigured)."""
-    url = f"{settings.public_web_url}/app"
+    lang = _loc(locale)
+    subject, title, cta, body = _COPY["ready"][lang]
+    url = f"{settings.public_web_url}/studio"
     if settings.mail_driver == "console":
-        print(
-            f"[console-mail] to={email} notes-ready project={project_title!r} {url}",
-            flush=True,
-        )
+        print(f"[console-mail] to={email} ready={url} lang={lang}", flush=True)
         return
     if settings.mail_driver == "smtp":
-        text = (
-            f'Good news — the speaker notes for "{project_title}" are ready.\n\n'
-            f"Open them here:\n{url}"
-        )
-        html = _html(
-            "Your notes are ready",
-            f'The speaker notes for "{project_title}" are ready. Open them and give '
-            "them a final read.",
-            "Open NotesBang",
-            url,
-        )
-        _send_smtp(settings, email, "Your speaker notes are ready", text, html)
+        _send_smtp(settings, email, subject, f"{body}\n\n{url}", _html(title, body, cta, url))
         return
-    # console/smtp only; other drivers silently skip notifications

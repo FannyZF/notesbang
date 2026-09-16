@@ -41,7 +41,8 @@ class ResetIn(BaseModel):
 
 
 class PreferencesIn(BaseModel):
-    notify_on_complete: bool
+    notify_on_complete: bool | None = None
+    locale: str | None = Field(default=None, pattern="^(en|zh)$")
 
 
 class AdminPointsIn(BaseModel):
@@ -96,6 +97,7 @@ class UserOut(BaseModel):
     email_verified: bool
     plan_state: str
     notify_on_complete: bool = True
+    locale: str = "en"
 
 
 # ---------- billing ----------

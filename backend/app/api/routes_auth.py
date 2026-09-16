@@ -39,6 +39,10 @@ def _utcnow_plus(hours: int) -> datetime:
     return datetime.now(timezone.utc) + timedelta(hours=hours)
 
 
+def _accept_locale(request: Request) -> str:
+    return "zh" if "zh" in (request.headers.get("accept-language") or "").lower() else "en"
+
+
 @router.post("/register", response_model=RegisterOut, status_code=201)
 def register(
     payload: RegisterIn,
@@ -77,7 +81,7 @@ def register(
         )
     )
     db.commit()
-    dev_url = send_verification_link(settings, user.email, token)
+    dev_url = send_verification_link(settings, user.email, token, _accept_locale(request))
     return RegisterOut(
         id=user.id,
         email=user.email,
@@ -170,9 +174,16 @@ def update_preferences(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user.notify_on_complete = payload.notify_on_complete
+    if payload.notify_on_complete is not None:
+        user.notify_on_complete = payload.notify_on_complete
+    if payload.locale is not None:
+        user.locale = payload.locale
     db.commit()
-    return {"ok": True, "notify_on_complete": user.notify_on_complete}
+    return {
+        "ok": True,
+        "notify_on_complete": user.notify_on_complete,
+        "locale": user.locale,
+    }
 
 
 @router.get("/export")
@@ -338,7 +349,7 @@ def resend_verification(
         )
     )
     db.commit()
-    dev_url = send_verification_link(settings, user.email, token)
+    dev_url = send_verification_link(settings, user.email, token, user.locale)
     return {"ok": True, "dev_verify_url": dev_url}
 
 
@@ -366,7 +377,7 @@ def forgot_password(
         )
     )
     db.commit()
-    dev_url = send_reset_link(settings, user.email, token)
+    dev_url = send_reset_link(settings, user.email, token, user.locale)
     return {"ok": True, "dev_reset_url": dev_url}
 
 
