@@ -1,6 +1,8 @@
 version: v1
-# Scoring uses ordinal bands 1..5; the code maps bands to fixed scores.
-band_scores: {1: 20, 2: 40, 3: 60, 4: 80, 5: 95}
+# Scoring uses ordinal bands 1..5; the model also gives an integer score inside
+# the band's range so results are finer-grained but still stable.
+band_scores: {1: 10, 2: 30, 3: 50, 4: 70, 5: 90}
+band_ranges: {1: [0, 20], 2: [21, 40], 3: [41, 60], 4: [61, 80], 5: [81, 100]}
 
 dimensions:
   - key: hook

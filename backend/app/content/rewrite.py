@@ -4,11 +4,34 @@ Mock provider returns deterministic placeholders so offline runs stay stable.
 """
 from __future__ import annotations
 
+import difflib
 import json
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 
 from app.content.rubric import get_platform, platform_label
 from app.llm.gateway import LLMError, Provider
+
+_TOKEN = re.compile(r"[A-Za-z0-9]+|\s+|[^\sA-Za-z0-9]")
+
+
+def build_diff(original: str, rewritten: str) -> list[dict]:
+    """Token-level diff (CJK per char, latin per word) for change highlighting."""
+    a = _TOKEN.findall(original)
+    b = _TOKEN.findall(rewritten)
+    sm = difflib.SequenceMatcher(a=a, b=b, autojunk=False)
+    segments: list[dict] = []
+    for op, i1, i2, j1, j2 in sm.get_opcodes():
+        if op == "equal":
+            segments.append({"op": "equal", "text": "".join(a[i1:i2])})
+        elif op == "delete":
+            segments.append({"op": "delete", "text": "".join(a[i1:i2])})
+        elif op == "insert":
+            segments.append({"op": "insert", "text": "".join(b[j1:j2])})
+        else:  # replace
+            segments.append({"op": "delete", "text": "".join(a[i1:i2])})
+            segments.append({"op": "insert", "text": "".join(b[j1:j2])})
+    return segments
 
 _REWRITE_SYSTEM = (
     "You are a senior editor for the given platform. Rewrite the copy so it is more "
@@ -48,6 +71,7 @@ _COMPLIANCE_SYSTEM = (
 class RewriteResult:
     rewritten: str
     changelog: list[dict]
+    diff: list[dict] = field(default_factory=list)
     model: str = ""
     input_tokens: int = 0
     output_tokens: int = 0
@@ -72,6 +96,7 @@ def rewrite_full(
         return RewriteResult(
             rewritten=content,
             changelog=[{"change": "mock: no change", "why": "offline placeholder"}],
+            diff=[{"op": "equal", "text": content}],
             model=provider.model,
         )
     p = get_platform(platform)
@@ -90,6 +115,7 @@ def rewrite_full(
     return RewriteResult(
         rewritten=str(data.get("rewritten", "")).strip(),
         changelog=list(data.get("changelog", []) or []),
+        diff=build_diff(content, str(data.get("rewritten", "")).strip()),
         model=provider.model,
         input_tokens=call.input_tokens,
         output_tokens=call.output_tokens,

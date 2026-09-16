@@ -41,6 +41,7 @@ class Platform:
 class Rubric:
     version: str
     band_scores: dict
+    band_ranges: dict
     dimensions: list[Dimension]
     platforms: dict
 
@@ -77,13 +78,39 @@ def load_rubric() -> Rubric:
     return Rubric(
         version=data.get("version", "v1"),
         band_scores={int(k): int(v) for k, v in data["band_scores"].items()},
+        band_ranges={
+            int(k): (int(v[0]), int(v[1])) for k, v in data["band_ranges"].items()
+        },
         dimensions=dims,
         platforms=platforms,
     )
 
 
 def band_to_score(band: int) -> int:
-    return load_rubric().band_scores.get(int(band), 60)
+    return load_rubric().band_scores.get(int(band), 50)
+
+
+def clamp_score(band: int, value: int | None) -> int:
+    """Keep a model-provided score inside its band range (else midpoint)."""
+    ranges = load_rubric().band_ranges
+    lo, hi = ranges.get(int(band), (0, 100))
+    if value is None:
+        return band_to_score(band)
+    try:
+        return max(lo, min(hi, int(value)))
+    except (TypeError, ValueError):
+        return band_to_score(band)
+
+
+def weights_with_focus(platform_key: str, focus: list[str] | None) -> dict:
+    """Base platform weights; focused dimensions get a 1.5x boost (renormalized)."""
+    weights = dict(get_platform(platform_key).weights)
+    if focus:
+        for key in focus:
+            if key in weights:
+                weights[key] = round(weights[key] * 1.5, 4)
+    total = sum(weights.values()) or 1.0
+    return {k: round(v / total, 4) for k, v in weights.items()}
 
 
 def get_platform(key: str) -> Platform:

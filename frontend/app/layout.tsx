@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NotesBang — tailor-made speaker notes for your moment",
+  title: "NotesBang — score and rewrite your copy",
   description:
-    "Upload your slides and get speaker notes matched to your pace, your time limit and your style — tuned to the moment you're speaking in.",
+    "Paste or upload your copy and get a platform-aware scorecard with evidence, plus a full rewrite and title/hook options.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

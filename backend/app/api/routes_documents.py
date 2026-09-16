@@ -157,9 +157,17 @@ def list_documents(
 @router.get("/platforms")
 def list_platforms(lang: str = Query(default="en")):
     rubric = load_rubric()
+    zh = lang.startswith("zh")
     return [
-        {"key": p.key, "label": p.label_zh if lang.startswith("zh") else p.label_en,
-         "weights": p.weights}
+        {
+            "key": p.key,
+            "label": p.label_zh if zh else p.label_en,
+            "weights": p.weights,
+            "dimensions": [
+                {"key": d.key, "label": d.label_zh if zh else d.label_en}
+                for d in rubric.dimensions
+            ],
+        }
         for p in rubric.platforms.values()
     ]
 
@@ -268,12 +276,14 @@ def _analysis_out(db: Session, analysis: Analysis) -> dict:
 def analyze_document(
     doc_id: int,
     lang: str = Query(default="en"),
+    focus: str = Query(default=""),
     user: User = Depends(require_verified),
     db: Session = Depends(get_db),
 ):
     doc = _owned(db, doc_id, user)
     _quota_check(db, user)
     provider = get_provider()
+    focus_keys = [k.strip() for k in focus.split(",") if k.strip()]
     try:
         result = scoring_mod.analyze(
             provider,
@@ -281,6 +291,7 @@ def analyze_document(
             content=doc.content,
             platform=doc.platform,
             lang=doc.language if doc.language in ("zh", "en") else lang,
+            focus=focus_keys or None,
         )
     except RuntimeError as exc:
         raise HTTPException(
@@ -363,7 +374,7 @@ def rewrite_document(
                 provider, title=doc.title, content=doc.content, platform=doc.platform,
                 lang=out_lang, summary=analysis.summary if analysis else "",
             )
-            content, meta = res.rewritten, {"changelog": res.changelog}
+            content, meta = res.rewritten, {"changelog": res.changelog, "diff": res.diff}
         elif payload.kind == "title":
             items = rewrite_mod.title_variants(
                 provider, title=doc.title, content=doc.content, platform=doc.platform, lang=out_lang
@@ -382,7 +393,7 @@ def rewrite_document(
             revised = rewrite_mod.section_edit(
                 provider, paragraph=payload.paragraph, issue=payload.issue or "", lang=out_lang
             )
-            content, meta = revised, {}
+            content, meta = revised, {"diff": rewrite_mod.build_diff(payload.paragraph, revised)}
     except RuntimeError as exc:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,

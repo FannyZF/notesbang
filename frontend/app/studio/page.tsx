@@ -7,7 +7,7 @@ import { useI18n } from "../../lib/i18n";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000/api";
 const MAX_CHARS = 3000;
 
-type Platform = { key: string; label: string };
+type Platform = { key: string; label: string; dimensions?: { key: string; label: string }[] };
 type Evidence = { quote: string; location?: string; verified?: boolean };
 type Suggestion = { issue: string; fix: string; example: string; location?: string };
 type Dimension = {
@@ -20,6 +20,7 @@ type Dimension = {
   evidence: Evidence[];
   suggestions: Suggestion[];
 };
+type DiffSegment = { op: "equal" | "insert" | "delete"; text: string };
 type Scorecard = {
   id: number;
   document_id: number;
@@ -58,7 +59,9 @@ export default function StudioPage() {
   const [docs, setDocs] = useState<Doc[]>([]);
   const [current, setCurrent] = useState<Doc | null>(null);
   const [card, setCard] = useState<Scorecard | null>(null);
-  const [rewrite, setRewrite] = useState<{ kind: string; content: string } | null>(null);
+  const [rewrite, setRewrite] = useState<{ kind: string; content: string; meta?: { diff?: DiffSegment[] } } | null>(null);
+  const [focus, setFocus] = useState<string[]>([]);
+  const [showDiff, setShowDiff] = useState(false);
 
   const req = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -196,9 +199,10 @@ export default function StudioPage() {
     setBusy(true);
     setNotice(null);
     try {
-      const c = (await req(`/documents/${current.id}/analyze?lang=${locale}`, {
-        method: "POST",
-      })) as Scorecard;
+      const c = (await req(
+        `/documents/${current.id}/analyze?lang=${locale}&focus=${focus.join(",")}`,
+        { method: "POST" }
+      )) as Scorecard;
       setCard(c);
     } catch (err) {
       const e = err as Error & { code?: string };
@@ -235,8 +239,9 @@ export default function StudioPage() {
       const r = (await req(`/documents/${current.id}/rewrite?lang=${locale}`, {
         method: "POST",
         body: JSON.stringify({ kind }),
-      })) as { kind: string; content: string };
+      })) as { kind: string; content: string; meta?: { diff?: DiffSegment[] } };
       setRewrite(r);
+      setShowDiff(kind === "full" && !!r.meta?.diff);
     } catch (err) {
       setNotice({ kind: "err", text: errMessage(err) });
     } finally {
@@ -264,6 +269,9 @@ export default function StudioPage() {
   };
 
   const chars = content.trim().length;
+  const dims = platforms.find((p) => p.key === platform)?.dimensions ?? [];
+  const toggleFocus = (key: string) =>
+    setFocus((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10 font-sans">
@@ -322,6 +330,25 @@ export default function StudioPage() {
                 <input type="file" accept=".docx,.txt,.md,.markdown" className="hidden" onChange={(e) => uploadFile(e.target.files?.[0] ?? null)} />
               </label>
             </div>
+            {dims.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-zinc-400">{t("studio.focus")}:</span>
+                {dims.map((d) => (
+                  <button
+                    key={d.key}
+                    onClick={() => toggleFocus(d.key)}
+                    className={`rounded-full px-3 py-1 font-medium transition ${
+                      focus.includes(d.key)
+                        ? "bg-zinc-900 text-white"
+                        : "border border-zinc-200 text-zinc-500 hover:bg-zinc-50"
+                    }`}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+                <span className="text-zinc-300">{t("studio.focus_hint")}</span>
+              </div>
+            )}
             <textarea
               className="mt-3 w-full rounded-2xl border border-zinc-200 p-4 text-[15px] leading-relaxed"
               rows={10}
@@ -359,12 +386,15 @@ export default function StudioPage() {
               </div>
               {card.summary && <p className="mt-3 text-sm text-zinc-600">{card.summary}</p>}
               <div className="mt-5 grid gap-4 md:grid-cols-2">
-                {card.dimensions.map((d) => (
+                {[...card.dimensions]
+                  .sort((a, b) => b.weight - a.weight)
+                  .map((d) => (
                   <div key={d.key} className="rounded-2xl border border-zinc-200/80 p-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="font-medium">{d.label}</span>
-                      <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs text-zinc-600">
-                        {t("studio.band")} {d.band}/5 · {d.score}
+                      <span className="shrink-0 rounded-full bg-zinc-100 px-2.5 py-1 text-xs text-zinc-600">
+                        {t("studio.score")} {d.score}/100 · {t("studio.band")} {d.band}/5 ·{" "}
+                        {t("studio.weight")} {Math.round(d.weight * 100)}%
                       </span>
                     </div>
                     <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
@@ -421,12 +451,42 @@ export default function StudioPage() {
               </div>
               {rewrite && (
                 <div className="mt-4">
-                  <p className="text-xs font-medium text-zinc-400">
-                    {rewrite.kind === "full" ? t("studio.revised") : rewrite.kind === "title" ? t("studio.title_options") : t("studio.hook_options")}
-                  </p>
-                  <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap rounded-2xl border border-zinc-200 bg-zinc-50/70 p-4 text-sm leading-relaxed text-zinc-700">
-                    {formatRewrite(rewrite)}
-                  </pre>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-medium text-zinc-400">
+                      {rewrite.kind === "full" ? t("studio.revised") : rewrite.kind === "title" ? t("studio.title_options") : t("studio.hook_options")}
+                    </p>
+                    {rewrite.kind === "full" && rewrite.meta?.diff && (
+                      <button
+                        onClick={() => setShowDiff((v) => !v)}
+                        className="rounded-full border border-zinc-200 px-3 py-1 text-xs text-zinc-600 hover:bg-zinc-50"
+                      >
+                        {showDiff ? t("studio.final") : t("studio.compare")}
+                      </button>
+                    )}
+                  </div>
+                  {rewrite.kind === "full" && showDiff && rewrite.meta?.diff ? (
+                    <div className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap rounded-2xl border border-zinc-200 bg-white p-4 text-sm leading-relaxed">
+                      {rewrite.meta.diff.map((seg, i) =>
+                        seg.op === "insert" ? (
+                          <span key={i} className="bg-emerald-50 text-emerald-700 underline decoration-emerald-400">
+                            {seg.text}
+                          </span>
+                        ) : seg.op === "delete" ? (
+                          <span key={i} className="text-red-400 line-through">
+                            {seg.text}
+                          </span>
+                        ) : (
+                          <span key={i} className="text-zinc-700">
+                            {seg.text}
+                          </span>
+                        )
+                      )}
+                    </div>
+                  ) : (
+                    <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap rounded-2xl border border-zinc-200 bg-zinc-50/70 p-4 text-sm leading-relaxed text-zinc-700">
+                      {formatRewrite(rewrite)}
+                    </pre>
+                  )}
                 </div>
               )}
             </section>

@@ -38,16 +38,32 @@ def test_create_analyze_scorecard(client):
     r = client.post(f"/api/documents/{doc['id']}/analyze", headers=_auth(token))
     assert r.status_code == 200, r.text
     card = r.json()
-    assert card["overall_score"] == 60  # mock: all bands 3
+    assert card["overall_score"] == 50  # mock: all bands 3, midpoint 50
     assert len(card["dimensions"]) == 6
     for d in card["dimensions"]:
-        assert d["band"] == 3 and d["score"] == 60
+        assert d["band"] == 3 and d["score"] == 50
         assert d["evidence"] and d["evidence"][0]["verified"] is True
         assert d["suggestions"]
 
     again = client.get(f"/api/documents/{doc['id']}/analysis", headers=_auth(token))
     assert again.status_code == 200
-    assert again.json()["overall_score"] == 60
+    assert again.json()["overall_score"] == 50
+
+
+def test_focus_boosts_dimension_weight(client):
+    token, _ = register_verified(client)
+    doc = _new_doc(client, token)
+    base = client.post(
+        f"/api/documents/{doc['id']}/analyze", headers=_auth(token)
+    ).json()
+    weights = {d["key"]: d["weight"] for d in base["dimensions"]}
+    focused = client.post(
+        f"/api/documents/{doc['id']}/analyze?focus=hook,title", headers=_auth(token)
+    ).json()
+    fw = {d["key"]: d["weight"] for d in focused["dimensions"]}
+    assert fw["hook"] > weights["hook"]
+    assert fw["title"] > weights["title"]
+    assert abs(sum(fw.values()) - 1.0) < 0.01
 
 
 def test_rewrite_full_titles_hooks_and_export(client):
@@ -59,6 +75,7 @@ def test_rewrite_full_titles_hooks_and_export(client):
         f"/api/documents/{doc['id']}/rewrite", headers=_auth(token), json={"kind": "full"}
     )
     assert full.status_code == 200 and full.json()["content"]
+    assert "diff" in full.json()["meta"]
 
     titles = client.post(
         f"/api/documents/{doc['id']}/rewrite", headers=_auth(token), json={"kind": "title"}
