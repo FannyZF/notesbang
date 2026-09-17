@@ -1,0 +1,20 @@
+# Keep the Docker build context small (the image only needs app/, alembic/,
+# requirements-docker.txt and the entrypoint).
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# Local runtime artifacts / secrets
+*.db
+*.sqlite3
+storage/
+tests_tmp/
+.env
+.env.*
+
+# Not needed in the image
+tests/
+scripts/
+*.md
