@@ -24,6 +24,9 @@ Start-Sleep -Milliseconds 800
 
 # 2) ensure the frontend production build exists
 if (-not $env:NEXT_PUBLIC_API_BASE) { $env:NEXT_PUBLIC_API_BASE = "http://localhost:$ApiPort/api" }
+# Email links (/verify, /reset) are frontend pages -> point at the web port.
+if (-not $env:APP_BASE_URL) { $env:APP_BASE_URL = "http://localhost:$WebPort" }
+if (-not $env:PUBLIC_WEB_URL) { $env:PUBLIC_WEB_URL = "http://localhost:$WebPort" }
 if (-not $env:NEXT_PUBLIC_FREE_DAILY_LIMIT) { $env:NEXT_PUBLIC_FREE_DAILY_LIMIT = if ($env:FREE_DAILY_LIMIT) { $env:FREE_DAILY_LIMIT } else { "3" } }
 if (-not $env:NEXT_PUBLIC_MAX_CONTENT_CHARS) { $env:NEXT_PUBLIC_MAX_CONTENT_CHARS = if ($env:CONTENT_MAX_CHARS) { $env:CONTENT_MAX_CHARS } else { "3000" } }
 $buildId = Join-Path $Root "frontend\.next\BUILD_ID"

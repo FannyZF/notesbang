@@ -162,6 +162,72 @@ def test_admin_smtp_settings_and_test_email(client):
         os.environ.pop("ADMIN_TOKEN", None)
 
 
+def test_admin_url_validation_and_warnings(client, monkeypatch):
+    os.environ["ADMIN_TOKEN"] = "test-admin-token"
+    try:
+        bad = client.put(
+            "/api/admin/settings",
+            headers=_admin_headers(),
+            json={"app_base_url": "not-a-url"},
+        )
+        assert bad.status_code == 422
+        assert "http" in bad.json()["detail"]
+
+        saved = client.put(
+            "/api/admin/settings",
+            headers=_admin_headers(),
+            json={
+                "mail_driver": "smtp",
+                "app_base_url": "http://localhost:3000",
+                "public_web_url": "http://localhost:3000",
+                "smtp_host": "smtp.example.com",
+                "smtp_from": "no-reply@example.com",
+            },
+        )
+        assert saved.status_code == 200, saved.text
+        codes = {w["code"] for w in saved.json()["warnings"]}
+        assert "smtp_localhost_link" in codes
+        assert "smtp_localhost_web" in codes
+
+        fetched = client.get("/api/admin/settings", headers=_admin_headers()).json()
+        assert any(w["code"] == "smtp_localhost_link" for w in fetched["warnings"])
+
+        import app.services.mail as mail_mod
+
+        monkeypatch.setattr(mail_mod, "_send_smtp", lambda *a, **k: None)
+        probe = client.post(
+            "/api/admin/smtp/test",
+            headers=_admin_headers(),
+            json={"to": "admin@example.com"},
+        )
+        assert probe.status_code == 200, probe.text
+        assert probe.json()["warning"]
+
+        fixed = client.put(
+            "/api/admin/settings",
+            headers=_admin_headers(),
+            json={
+                "app_base_url": "https://notes.example.com",
+                "public_web_url": "https://notes.example.com",
+            },
+        )
+        assert fixed.status_code == 200
+        assert fixed.json()["warnings"] == []
+    finally:
+        os.environ.pop("ADMIN_TOKEN", None)
+
+
+def test_mail_fallback_copy_is_localized():
+    from app.services.mail import _FALLBACK, _html
+
+    html_zh = _html("标题", "正文", "按钮", "https://x.example/verify?token=abc", _FALLBACK["zh"])
+    assert "按钮无法点击" in html_zh
+    assert "https://x.example/verify?token=abc" in html_zh
+
+    html_en = _html("T", "B", "C", "https://x.example/verify?token=abc", _FALLBACK["en"])
+    assert "Button not working" in html_en
+
+
 def test_admin_users_report_usage(client):
     os.environ["ADMIN_TOKEN"] = "test-admin-token"
     try:

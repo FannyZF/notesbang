@@ -29,7 +29,9 @@ class Settings:
             "true",
             "yes",
         )
-        self.app_base_url = os.getenv("APP_BASE_URL", "http://localhost:8000")
+        # Origin used to build links inside emails. /verify and /reset are
+        # frontend pages, so the default points at the web server, not the API.
+        self.app_base_url = os.getenv("APP_BASE_URL", "http://localhost:3000")
         self.token_ttl_hours = int(os.getenv("TOKEN_TTL_HOURS", "24"))
 
         # Product knobs (see PRD §17 pending items; defaults are placeholders).

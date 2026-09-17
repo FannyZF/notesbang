@@ -39,7 +39,13 @@ def _loc(locale: str | None) -> str:
     return "zh" if (locale or "").lower().startswith("zh") else "en"
 
 
-def _html(title: str, body: str, cta: str, url: str) -> str:
+_FALLBACK = {
+    "en": "Button not working? Copy this link into your browser:",
+    "zh": "按钮无法点击？请复制以下链接到浏览器打开：",
+}
+
+
+def _html(title: str, body: str, cta: str, url: str, fallback: str) -> str:
     return f"""\
 <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
             max-width:520px;margin:0 auto;padding:32px 24px;color:#18181b">
@@ -50,7 +56,8 @@ def _html(title: str, body: str, cta: str, url: str) -> str:
   <p style="font-size:15px;line-height:1.6;color:#52525b;margin:0 0 20px">{body}</p>
   <a href="{url}" style="display:inline-block;background:#18181b;color:#fff;text-decoration:none;
      padding:12px 22px;border-radius:999px;font-size:15px;font-weight:500">{cta}</a>
-  <p style="font-size:12px;color:#a1a1aa;margin-top:24px;word-break:break-all">{url}</p>
+  <p style="font-size:12px;color:#a1a1aa;margin-top:24px">{fallback}</p>
+  <p style="font-size:12px;color:#a1a1aa;margin:4px 0 0;word-break:break-all">{url}</p>
 </div>"""
 
 
@@ -101,12 +108,30 @@ def _send_smtp(cfg: dict, to_email: str, subject: str, text: str, html: str) -> 
         server.sendmail(cfg["smtp_from"], [to_email], msg.as_string())
 
 
+def _link_warning(cfg: dict) -> str | None:
+    """Warn (never block) when real emails would carry an unreachable link."""
+    if cfg["mail_driver"] != "smtp":
+        return None
+    from app.core.runtime import is_local_url
+
+    if is_local_url(cfg["app_base_url"]):
+        return (
+            "mail: SMTP is enabled but app_base_url is local "
+            f"({cfg['app_base_url']}); recipients cannot open the emailed link. "
+            "Set the public site origin in admin → Runtime settings."
+        )
+    return None
+
+
 def send_test_email(settings: Settings, to_email: str) -> dict:
     """Send a probe email so admins can validate SMTP settings."""
     cfg = _cfg(settings)
+    warning = _link_warning(cfg)
+    if warning:
+        print(f"[mail-warning] {warning}", flush=True)
     if cfg["mail_driver"] == "console":
         print(f"[console-mail] test to={to_email}", flush=True)
-        return {"ok": True, "driver": "console"}
+        return {"ok": True, "driver": "console", "warning": warning}
     _send_smtp(
         cfg,
         to_email,
@@ -117,9 +142,10 @@ def send_test_email(settings: Settings, to_email: str) -> dict:
             "If you received this, your SMTP settings are working.",
             "Open NotesBang",
             cfg["public_web_url"] or cfg["app_base_url"],
+            _FALLBACK["en"],
         ),
     )
-    return {"ok": True, "driver": "smtp"}
+    return {"ok": True, "driver": "smtp", "warning": warning}
 
 
 def _send(
@@ -133,8 +159,13 @@ def _send(
         print(f"[console-mail] to={email} {kind}={url} lang={lang}", flush=True)
         return url
     if cfg["mail_driver"] == "smtp":
+        warning = _link_warning(cfg)
+        if warning:
+            print(f"[mail-warning] {warning}", flush=True)
         text = f"{body}\n\n{url}"
-        _send_smtp(cfg, email, subject, text, _html(title, body, cta, url))
+        _send_smtp(
+            cfg, email, subject, text, _html(title, body, cta, url, _FALLBACK[lang])
+        )
         return None
     raise NotImplementedError(f"mail driver '{cfg['mail_driver']}' not implemented")
 
@@ -162,5 +193,7 @@ def send_generation_ready(
         print(f"[console-mail] to={email} ready={url} lang={lang}", flush=True)
         return
     if cfg["mail_driver"] == "smtp":
-        _send_smtp(cfg, email, subject, f"{body}\n\n{url}", _html(title, body, cta, url))
+        _send_smtp(
+            cfg, email, subject, f"{body}\n\n{url}", _html(title, body, cta, url, _FALLBACK[lang])
+        )
         return

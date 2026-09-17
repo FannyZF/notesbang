@@ -52,6 +52,7 @@ type Settings = {
   smtp_use_tls: boolean;
   app_base_url: string;
   public_web_url: string;
+  warnings: { code: string; message: string }[];
 };
 type SettingsForm = {
   llm_provider: string;
@@ -201,8 +202,11 @@ export default function AdminPage() {
         body: JSON.stringify({ to }),
       });
       if (!r.ok) throw new Error(`Test ${r.status}: ${(await r.text()).slice(0, 300)}`);
-      const body = (await r.json()) as { driver: string };
-      setNotice(`Test email sent (driver=${body.driver}) → ${to}`);
+      const body = (await r.json()) as { driver: string; warning?: string | null };
+      setNotice(
+        `Test email sent (driver=${body.driver}) → ${to}` +
+          (body.warning ? `\n⚠ ${body.warning}` : "")
+      );
     } catch (err) {
       setError(errMessage(err));
     } finally {
@@ -346,6 +350,13 @@ export default function AdminPage() {
             </span>
           </div>
           <form onSubmit={saveSettings} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {settings.warnings.length > 0 && (
+              <div className="col-span-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800">
+                {settings.warnings.map((w) => (
+                  <p key={w.code}>⚠ {w.message}</p>
+                ))}
+              </div>
+            )}
             <label className="flex flex-col gap-1 text-xs text-zinc-500">
               LLM provider
               <select
@@ -408,8 +419,12 @@ export default function AdminPage() {
                 <option value="false">disabled (25)</option>
               </select>
             </label>
-            {field("app_base_url", "API base URL (email links)", { placeholder: "https://api.example.com" })}
-            {field("public_web_url", "Web base URL", { placeholder: "https://example.com" })}
+            {field("app_base_url", "API base URL (email links)", { placeholder: "https://your-domain" })}
+            <p className="col-span-full -mt-2 text-[11px] leading-relaxed text-zinc-400">
+              必须是可公开访问的站点地址（如 https://your-domain）。/verify、/reset 是前端页面，
+              请填站点地址，不要填 .../api。
+            </p>
+            {field("public_web_url", "Web base URL", { placeholder: "https://your-domain" })}
 
             <div className="col-span-full flex flex-wrap items-end gap-2 border-t border-zinc-100 pt-3">
               <label className="flex flex-col gap-1 text-xs text-zinc-500">

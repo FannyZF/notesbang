@@ -2,14 +2,17 @@
 from __future__ import annotations
 
 from app.core.config import Settings
-from app.services.mail import _html, send_reset_link, send_verification_link
+from app.services.mail import _FALLBACK, _html, send_reset_link, send_verification_link
 
 
 def test_html_template_contains_cta_and_url():
-    html = _html("Title", "Body", "Click", "https://example.com/x?token=abc")
+    html = _html(
+        "Title", "Body", "Click", "https://example.com/x?token=abc", _FALLBACK["en"]
+    )
     assert "NotesBang" in html
     assert "Click" in html
     assert "https://example.com/x?token=abc" in html
+    assert "Button not working" in html
 
 
 def test_console_driver_returns_links():

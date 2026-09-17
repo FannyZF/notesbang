@@ -125,3 +125,44 @@ def mail_config(db: Session) -> dict:
             get_setting(db, "public_web_url") or settings.public_web_url
         ).rstrip("/"),
     }
+
+
+_LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"})
+
+
+def is_local_url(url: str) -> bool:
+    """True when the URL points at a loopback/unspecified host (unreachable by mail recipients)."""
+    from urllib.parse import urlparse
+
+    host = (urlparse(url).hostname or "").lower()
+    return host in _LOCAL_HOSTS
+
+
+def mail_warnings(db: Session) -> list[dict]:
+    """Non-fatal misconfigurations worth surfacing in the admin console."""
+    cfg = mail_config(db)
+    warnings: list[dict] = []
+    if cfg["mail_driver"] != "smtp":
+        return warnings
+    if is_local_url(cfg["app_base_url"]):
+        warnings.append(
+            {
+                "code": "smtp_localhost_link",
+                "message": (
+                    "已启用 SMTP 发信，但邮件链接域名（API base URL）仍是本地地址 "
+                    f"（{cfg['app_base_url']}），收件人无法打开验证链接。"
+                    "请填写可公开访问的站点地址，例如 https://your-domain。"
+                ),
+            }
+        )
+    if is_local_url(cfg["public_web_url"]):
+        warnings.append(
+            {
+                "code": "smtp_localhost_web",
+                "message": (
+                    "已启用 SMTP 发信，但 Web base URL 仍是本地地址 "
+                    f"（{cfg['public_web_url']}）。"
+                ),
+            }
+        )
+    return warnings

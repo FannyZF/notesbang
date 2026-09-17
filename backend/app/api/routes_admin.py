@@ -176,6 +176,7 @@ def admin_get_settings(request: Request, db: Session = Depends(get_db)):
         "smtp_use_tls": mail["smtp_use_tls"],
         "app_base_url": mail["app_base_url"],
         "public_web_url": mail["public_web_url"],
+        "warnings": runtime.mail_warnings(db),
         "overrides": overrides,
         "env": {
             "llm_provider": settings.llm_provider,
@@ -196,6 +197,24 @@ def admin_get_settings(request: Request, db: Session = Depends(get_db)):
             "public_web_url": settings.public_web_url,
         },
     }
+
+
+def _validate_url(key: str, value: str) -> None:
+    """Accept an absolute http(s) URL; an empty string clears the override."""
+    raw = value.strip()
+    if raw == "":
+        return
+    from urllib.parse import urlparse
+
+    parsed = urlparse(raw)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc or " " in raw:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"{key} 必须是完整的 http(s) 地址，例如 https://your-domain"
+                "（/verify 属前端页面，请填站点地址，不要填 .../api）"
+            ),
+        )
 
 
 @router.put("/settings")
@@ -231,6 +250,8 @@ def admin_update_settings(
                     status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=f"{key} must be >= 0",
                 )
+        if key in ("app_base_url", "public_web_url"):
+            _validate_url(key, str(value))
         runtime.set_setting(db, key, str(value).strip())
     db.commit()
     return admin_get_settings(request, db)
