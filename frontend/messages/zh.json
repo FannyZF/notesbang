@@ -73,6 +73,7 @@
     "strengths": "共识优势",
     "weaknesses": "共识劣势",
     "committee": "综合评价",
+    "details": "证据与建议",
     "viewpoints_aligned": "该维度各专家意见一致。",
     "delete_confirm": "删除该文档及其分析结果？此操作不可撤销。",
     "deleted": "文档已删除。"

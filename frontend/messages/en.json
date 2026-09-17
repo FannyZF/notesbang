@@ -73,6 +73,7 @@
     "strengths": "Consensus strengths",
     "weaknesses": "Consensus weaknesses",
     "committee": "Committee",
+    "details": "Evidence & suggestions",
     "viewpoints_aligned": "All experts agree on this dimension.",
     "delete_confirm": "Delete this document and its analysis? This cannot be undone.",
     "deleted": "Document deleted."
