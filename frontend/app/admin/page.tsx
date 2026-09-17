@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000/api";
 
@@ -68,7 +68,10 @@ export default function AdminPage() {
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const headers = token ? ({ Authorization: `Bearer ${token}` } as Record<string, string>) : undefined;
+  const headers = useMemo(
+    () => (token ? ({ Authorization: `Bearer ${token}` } as Record<string, string>) : undefined),
+    [token]
+  );
 
   const load = useCallback(async () => {
     if (!token) return;
