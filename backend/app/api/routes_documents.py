@@ -217,15 +217,21 @@ def delete_document(
     db: Session = Depends(get_db),
 ):
     doc = _owned(db, doc_id, user)
-    db.query(DimensionScore).filter(
-        DimensionScore.analysis_id.in_(
-            db.query(Analysis.id).filter(Analysis.document_id == doc.id)
-        )
-    ).delete(synchronize_session=False)
+    analysis_ids = [
+        row[0] for row in db.query(Analysis.id).filter(Analysis.document_id == doc.id).all()
+    ]
+    if analysis_ids:
+        db.query(DimensionScore).filter(
+            DimensionScore.analysis_id.in_(analysis_ids)
+        ).delete(synchronize_session=False)
+        db.query(ExpertScore).filter(
+            ExpertScore.analysis_id.in_(analysis_ids)
+        ).delete(synchronize_session=False)
     db.query(Analysis).filter(Analysis.document_id == doc.id).delete(synchronize_session=False)
     db.query(Rewrite).filter(Rewrite.document_id == doc.id).delete(synchronize_session=False)
     db.query(Feedback).filter(Feedback.document_id == doc.id).delete(synchronize_session=False)
     db.query(CorpusFeature).filter(CorpusFeature.document_id == doc.id).delete(synchronize_session=False)
+    db.query(Job).filter(Job.document_id == doc.id).delete(synchronize_session=False)
     db.delete(doc)
     db.commit()
     return {"ok": True}

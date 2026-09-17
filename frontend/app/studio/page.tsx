@@ -281,6 +281,22 @@ export default function StudioPage() {
     }
   };
 
+  const deleteDoc = async (id: number) => {
+    if (!window.confirm(t("studio.delete_confirm"))) return;
+    try {
+      await req(`/documents/${id}`, { method: "DELETE" });
+      setDocs((prev) => prev.filter((d) => d.id !== id));
+      if (current?.id === id) {
+        setCurrent(null);
+        setCard(null);
+        setRewrite(null);
+      }
+      setNotice({ kind: "ok", text: t("studio.deleted") });
+    } catch (err) {
+      setNotice({ kind: "err", text: errMessage(err) });
+    }
+  };
+
   const doRewrite = async (kind: "full" | "title" | "hook") => {
     if (!current) return;
     setBusy(true);
@@ -700,12 +716,27 @@ export default function StudioPage() {
             {docs.length === 0 && <p className="mt-2 text-sm text-zinc-400">{t("studio.no_docs")}</p>}
             <div className="mt-3 flex flex-col gap-2">
               {docs.map((d) => (
-                <button key={d.id} onClick={() => openDoc(d.id)} className="flex items-center justify-between rounded-xl border border-zinc-200/80 px-4 py-2.5 text-left transition hover:bg-zinc-50">
-                  <span className="truncate text-sm text-zinc-700">{d.title || "Untitled"}</span>
-                  <span className="shrink-0 text-xs text-zinc-400">
-                    {d.platform} · {d.char_count} {t("studio.chars")}
-                  </span>
-                </button>
+                <div
+                  key={d.id}
+                  className="flex items-center gap-2 rounded-xl border border-zinc-200/80 px-2 py-1.5 transition hover:bg-zinc-50"
+                >
+                  <button
+                    onClick={() => openDoc(d.id)}
+                    className="flex flex-1 items-center justify-between gap-3 px-2 py-1 text-left"
+                  >
+                    <span className="truncate text-sm text-zinc-700">{d.title || "Untitled"}</span>
+                    <span className="shrink-0 text-xs text-zinc-400">
+                      {d.platform} · {d.char_count} {t("studio.chars")}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => void deleteDoc(d.id)}
+                    className="shrink-0 rounded-full px-3 py-1 text-xs text-zinc-400 transition hover:bg-red-50 hover:text-red-600"
+                    title={t("common.delete")}
+                  >
+                    {t("common.delete")}
+                  </button>
+                </div>
               ))}
             </div>
           </section>

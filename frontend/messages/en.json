@@ -68,6 +68,8 @@
     "must_fix": "Must fix",
     "adopt": "Adopt expert advice",
     "adopt_hint": "Choose which experts' advice to apply in the rewrite (default: all)",
-    "radar": "Expert score profiles"
+    "radar": "Expert score profiles",
+    "delete_confirm": "Delete this document and its analysis? This cannot be undone.",
+    "deleted": "Document deleted."
   }
 }

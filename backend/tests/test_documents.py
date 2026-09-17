@@ -151,6 +151,33 @@ def test_char_cap(client):
     assert r.headers.get("X-Error-Code") == "CONTENT_TOO_LONG"
 
 
+def test_delete_document_cascades(client):
+    from app.db.base import SessionLocal
+    from app.models import Analysis, DimensionScore, ExpertScore, Rewrite
+
+    token, _ = register_verified(client)
+    doc = _new_doc(client, token)
+    _analyze(client, token, doc["id"])
+    client.post(
+        f"/api/documents/{doc['id']}/rewrite", headers=_auth(token), json={"kind": "full"}
+    )
+
+    d = client.delete(f"/api/documents/{doc['id']}", headers=_auth(token))
+    assert d.status_code == 200
+
+    db = SessionLocal()
+    try:
+        assert db.query(Analysis).filter(Analysis.document_id == doc["id"]).count() == 0
+        assert db.query(Rewrite).filter(Rewrite.document_id == doc["id"]).count() == 0
+        assert db.query(ExpertScore).count() == 0
+        assert db.query(DimensionScore).count() == 0
+    finally:
+        db.close()
+
+    assert client.get(f"/api/documents/{doc['id']}", headers=_auth(token)).status_code == 404
+    assert all(x["id"] != doc["id"] for x in client.get("/api/documents", headers=_auth(token)).json())
+
+
 def test_upload_txt(client):
     token, _ = register_verified(client)
     r = client.post(
