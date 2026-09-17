@@ -14,14 +14,26 @@ title/hook variants. Free: 5 analyses/day. Bilingual UI (zh/en).
 
 ## Content-scoring API
 1. `POST /api/documents` (paste) or `POST /api/documents/upload` (file) → parsed, capped, language-detected.
-2. `POST /api/documents/{id}/analyze` → scorecard (two-stage rubric scoring; evidence verified).
-3. `POST /api/documents/{id}/rewrite` `{kind: full|title|hook}` → rewrite + variants.
+2. `POST /api/documents/{id}/analyze` → **async**: returns `{job_id}`; poll `GET /api/jobs/{id}`
+   (`status/phase/progress`) then read `GET /api/documents/{id}/analysis`.
+3. `POST /api/documents/{id}/rewrite` `{kind: full|title|hook, adopt:[expert_keys]}` → rewrite + variants
+   (+ token-level `diff` for the full rewrite).
 4. `GET /api/documents/{id}/export?fmt=md|docx|txt` → scorecard + rewrite.
 5. `POST /api/documents/{id}/outcome` and `POST /api/documents/feedback` → corpus labels.
 
-Rubrics live in `backend/app/llm/rubrics/rubric_v1.yaml`; scoring is ordinal
-(1–5 bands) with the overall score computed in code. `backend/tests/test_golden_scoring.py`
-is the stability harness (set `RUN_GOLDEN=1` + key for the real-model run).
+### Review committee
+Analysis runs a **five-expert committee** in parallel (compliance officer, viral
+editor, subject-matter expert, audience advocate, structure editor), each scoring
+all six dimensions (ordinal bands 1–5 + in-band score + evidence). The code
+aggregates equal-weight per-dimension averages, **spread** (disagreement) and the
+weighted overall score; a chair pass writes the consensus (priorities,
+disagreement notes, must-fix list) without re-scoring. The UI shows an expert
+radar chart, per-dimension viewpoints, and lets the user choose which experts'
+advice to adopt in the rewrite.
+
+Rubrics + experts live in `backend/app/llm/rubrics/rubric_v1.yaml`; free tier is
+**3 analyses/day**. `backend/tests/test_golden_scoring.py` is the stability harness
+(set `RUN_GOLDEN=1` + key for the real-model run).
 
 ## Repository layout
 
