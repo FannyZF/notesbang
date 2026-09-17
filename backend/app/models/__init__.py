@@ -100,7 +100,9 @@ class Job(Base):
     __tablename__ = "jobs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    project_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, default=0, index=True
+    )
     document_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     type: Mapped[str] = mapped_column(String(24))
     target_id: Mapped[int | None] = mapped_column(Integer, nullable=True)

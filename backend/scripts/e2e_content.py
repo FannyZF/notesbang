@@ -41,17 +41,30 @@ def main() -> int:
         print("DOC", doc.json())
 
         t0 = time.time()
-        card = c.post(f"{BASE}/documents/{did}/analyze?lang=zh", headers=h)
+        start = c.post(f"{BASE}/documents/{did}/analyze?lang=zh", headers=h)
+        start.raise_for_status()
+        job_id = start.json()["job_id"]
+        status = "queued"
+        while time.time() - t0 < 300:
+            job = c.get(f"{BASE}/jobs/{job_id}", headers=h).json()
+            print(f"  job {job['status']} {job['progress']}% {job['phase']}")
+            status = job["status"]
+            if status in ("succeeded", "failed"):
+                break
+            time.sleep(2)
+        assert status == "succeeded", status
+
+        card = c.get(f"{BASE}/documents/{did}/analysis?lang=zh", headers=h)
         card.raise_for_status()
         body = card.json()
-        print(f"ANALYZE {round(time.time()-t0,1)}s overall={body['overall_score']}")
+        print(f"ANALYZE {round(time.time()-t0,1)}s overall={body['overall_score']} experts={len(body.get('experts', []))}")
         for d in body["dimensions"]:
             ev = d["evidence"][0]["quote"] if d["evidence"] else "-"
-            print(f"  {d['key']}: band {d['band']} score {d['score']} | {ev[:30]}")
+            print(f"  {d['key']}: score {d['score']} spread {d.get('spread')} | {ev[:24]}")
 
         full = c.post(f"{BASE}/documents/{did}/rewrite?lang=zh", headers=h, json={"kind": "full"})
         full.raise_for_status()
-        print("REWRITE chars:", len(full.json()["content"]))
+        print("REWRITE chars:", len(full.json()["content"]), "diff segs:", len(full.json()["meta"].get("diff", [])))
 
         ex = c.get(f"{BASE}/documents/{did}/export?fmt=md", headers=h)
         ex.raise_for_status()
