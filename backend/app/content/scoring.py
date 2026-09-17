@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from typing import Callable
 
 from pydantic import BaseModel, Field
 
@@ -256,8 +258,13 @@ def analyze(
     lang: str,
     voice_profile: str | None = None,
     focus: list[str] | None = None,
+    on_progress: Callable[[int, str], None] | None = None,
 ) -> AnalysisResult:
     from app.content.features import extract_facts
+
+    def progress(pct: int, phase: str) -> None:
+        if on_progress is not None:
+            on_progress(pct, phase)
 
     settings = get_settings()
     facts = extract_facts(content, title)
@@ -266,8 +273,11 @@ def analyze(
         return AnalysisResult(**{**_cache[key], "cached": True})
 
     if provider.model.startswith("mock"):
+        progress(30, "Committee reviewing")
+        progress(80, "Scoring & consensus")
         return _mock_result(content, platform, lang, focus)
 
+    progress(5, "Reading your copy")
     rubric_text = render_rubric_blocks(platform, lang)
     p_label = platform_label(platform, lang)
     base_user = (
@@ -293,6 +303,8 @@ def analyze(
     experts = rubric_experts()
     results: dict[str, _ScoreOut] = {}
     errors: list[str] = []
+    done_count = 0
+    progress(30, "Committee reviewing")
 
     def work(exp):
         return exp.key, _run_expert(provider, _expert_system(exp, lang), expert_user)
@@ -301,6 +313,8 @@ def analyze(
         for key_name, outcome in pool.map(
             lambda e: _safe(work, e), experts
         ):
+            done_count += 1
+            progress(30 + int(50 * done_count / max(len(experts), 1)), "Committee reviewing")
             if outcome is None:
                 errors.append(key_name)
                 continue
@@ -383,6 +397,7 @@ def analyze(
         )
 
     # Chair synthesis (aggregation only, no re-scoring)
+    progress(85, "Writing suggestions")
     chair_user = "\n\n".join(
         f"== {e['label']} ==\n"
         + "\n".join(f"{d['key']}({d['band']},{d['score']}): {d['rationale']}" for d in e["dimensions"])
@@ -420,6 +435,7 @@ def analyze(
     )
     if settings.scoring_cache_enabled:
         _cache[key] = result.__dict__.copy()
+    progress(98, "Writing suggestions")
     return result
 
 

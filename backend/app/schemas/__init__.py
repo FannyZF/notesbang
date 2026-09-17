@@ -70,6 +70,7 @@ class RewriteIn(BaseModel):
     kind: str = Field(default="full", pattern="^(full|title|hook|section)$")
     paragraph: str | None = None
     issue: str | None = None
+    adopt: list[str] = Field(default_factory=list)
 
 
 class FeedbackIn(BaseModel):

@@ -1,5 +1,11 @@
-"""Content-scoring API tests (mock provider = deterministic)."""
+"""Content-scoring API tests (mock provider = deterministic).
+
+Analyze is now async: POST returns a job; with EXEC_ASYNC=false the job runs
+inline so we can read the analysis immediately (tests also poll the job API).
+"""
 from __future__ import annotations
+
+import json
 
 from tests.conftest import _auth, register_verified
 
@@ -21,12 +27,26 @@ def _new_doc(client, token, platform="xiaohongshu"):
     return r.json()
 
 
+def _analyze(client, token, doc_id, focus=""):
+    r = client.post(
+        f"/api/documents/{doc_id}/analyze?lang=zh&focus={focus}", headers=_auth(token)
+    )
+    assert r.status_code == 200, r.text
+    job_id = r.json()["job_id"]
+    job = client.get(f"/api/jobs/{job_id}", headers=_auth(token)).json()
+    assert job["status"] == "succeeded", job
+    assert job["document_id"] == doc_id
+    return client.get(f"/api/documents/{doc_id}/analysis?lang=zh", headers=_auth(token)).json()
+
+
 def test_platforms_list(client):
     token, _ = register_verified(client)
     r = client.get("/api/documents/platforms?lang=zh", headers=_auth(token))
     assert r.status_code == 200
-    keys = {p["key"] for p in r.json()}
+    data = r.json()
+    keys = {p["key"] for p in data}
     assert {"xiaohongshu", "wechat", "linkedin", "x", "blog"} <= keys
+    assert data[0]["dimensions"]  # dimension labels exposed for focus chips
 
 
 def test_create_analyze_scorecard(client):
@@ -35,31 +55,25 @@ def test_create_analyze_scorecard(client):
     assert doc["char_count"] > 0
     assert doc["language"] == "zh"
 
-    r = client.post(f"/api/documents/{doc['id']}/analyze", headers=_auth(token))
-    assert r.status_code == 200, r.text
-    card = r.json()
-    assert card["overall_score"] == 50  # mock: all bands 3, midpoint 50
+    card = _analyze(client, token, doc["id"])
+    assert card["overall_score"] == 50  # mock committee: all bands 3, midpoint 50
     assert len(card["dimensions"]) == 6
+    assert len(card["experts"]) == 5  # five committee members
     for d in card["dimensions"]:
         assert d["band"] == 3 and d["score"] == 50
         assert d["evidence"] and d["evidence"][0]["verified"] is True
         assert d["suggestions"]
-
-    again = client.get(f"/api/documents/{doc['id']}/analysis", headers=_auth(token))
-    assert again.status_code == 200
-    assert again.json()["overall_score"] == 50
+        assert len(d["viewpoints"]) == 5  # one viewpoint per expert
+        assert "spread" in d
+    assert set(card["consensus"].keys()) >= {"top_priorities", "must_fix"}
 
 
 def test_focus_boosts_dimension_weight(client):
     token, _ = register_verified(client)
     doc = _new_doc(client, token)
-    base = client.post(
-        f"/api/documents/{doc['id']}/analyze", headers=_auth(token)
-    ).json()
+    base = _analyze(client, token, doc["id"])
     weights = {d["key"]: d["weight"] for d in base["dimensions"]}
-    focused = client.post(
-        f"/api/documents/{doc['id']}/analyze?focus=hook,title", headers=_auth(token)
-    ).json()
+    focused = _analyze(client, token, doc["id"], focus="hook,title")
     fw = {d["key"]: d["weight"] for d in focused["dimensions"]}
     assert fw["hook"] > weights["hook"]
     assert fw["title"] > weights["title"]
@@ -69,19 +83,22 @@ def test_focus_boosts_dimension_weight(client):
 def test_rewrite_full_titles_hooks_and_export(client):
     token, _ = register_verified(client)
     doc = _new_doc(client, token)
-    client.post(f"/api/documents/{doc['id']}/analyze", headers=_auth(token))
+    _analyze(client, token, doc["id"])
 
     full = client.post(
-        f"/api/documents/{doc['id']}/rewrite", headers=_auth(token), json={"kind": "full"}
+        f"/api/documents/{doc['id']}/rewrite",
+        headers=_auth(token),
+        json={"kind": "full", "adopt": ["compliance", "viral"]},
     )
     assert full.status_code == 200 and full.json()["content"]
     assert "diff" in full.json()["meta"]
+    assert full.json()["meta"]["adopt"] == ["compliance", "viral"]
 
     titles = client.post(
         f"/api/documents/{doc['id']}/rewrite", headers=_auth(token), json={"kind": "title"}
     )
     assert titles.status_code == 200
-    assert len(__import__("json").loads(titles.json()["content"])) == 5
+    assert len(json.loads(titles.json()["content"])) == 5
 
     hooks = client.post(
         f"/api/documents/{doc['id']}/rewrite", headers=_auth(token), json={"kind": "hook"}

@@ -91,6 +91,7 @@ def rewrite_full(
     lang: str,
     summary: str = "",
     voice_profile: str | None = None,
+    expert_notes: str = "",
 ) -> RewriteResult:
     if provider.model.startswith("mock"):
         return RewriteResult(
@@ -101,11 +102,14 @@ def rewrite_full(
         )
     p = get_platform(platform)
     norms = p.norms_zh if lang.startswith("zh") else p.norms_en
+    expert_block = (
+        f"\n【评审委员会意见（需采纳）】\n{expert_notes}\n" if expert_notes else ""
+    )
     user = (
         f"【平台】{platform_label(platform, lang)}\n【平台规范】{norms}\n"
         f"【上限】{_limits(platform).get('max_chars', 3000)} 字\n"
         f"【标题】{title or '(none)'}\n【作者口吻】{voice_profile or '贴近原文'}\n"
-        f"【评分要点】{summary}\n\n<<<CONTENT\n{content}\nCONTENT"
+        f"【评分要点】{summary}\n{expert_block}\n<<<CONTENT\n{content}\nCONTENT"
     )
     try:
         call = provider.chat(_REWRITE_SYSTEM, user, json_mode=True)

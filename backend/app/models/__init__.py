@@ -106,6 +106,7 @@ class Job(Base):
     target_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="queued")
     phase: Mapped[str] = mapped_column(String(64), default="")
+    params_json: Mapped[str] = mapped_column(Text, default="{}")
     progress: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(String(500), nullable=True)
     charge_amount: Mapped[int] = mapped_column(Integer, default=0)

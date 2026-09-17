@@ -25,6 +25,7 @@ from app.models import (
     Document,
     ExpertScore,
     Feedback,
+    Job,
     Rewrite,
     User,
 )
@@ -339,73 +340,28 @@ def analyze_document(
     user: User = Depends(require_verified),
     db: Session = Depends(get_db),
 ):
+    """Enqueue a committee analysis; poll GET /api/jobs/{id} for progress."""
     doc = _owned(db, doc_id, user)
     _quota_check(db, user)
-    provider = get_provider()
     focus_keys = [k.strip() for k in focus.split(",") if k.strip()]
-    try:
-        result = scoring_mod.analyze(
-            provider,
-            title=doc.title,
-            content=doc.content,
-            platform=doc.platform,
-            lang=doc.language if doc.language in ("zh", "en") else lang,
-            focus=focus_keys or None,
-        )
-    except RuntimeError as exc:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(exc),
-            headers={"X-Error-Code": "ANALYSIS_FAILED"},
-        ) from exc
 
-    analysis = Analysis(
+    job = Job(
         document_id=doc.id,
-        rubric_version=result.rubric_version,
-        platform=result.platform,
-        overall_score=result.overall_score,
-        summary=result.summary,
-        consensus_json=json.dumps(result.consensus, ensure_ascii=False),
-        model=result.model,
-        input_tokens=result.input_tokens,
-        output_tokens=result.output_tokens,
-        cost_est=result.cost_est,
+        type="analyze",
+        status="queued",
+        phase="Queued",
+        params_json=json.dumps({"focus": focus_keys, "lang": lang}, ensure_ascii=False),
     )
-    db.add(analysis)
-    db.flush()
-    for d in result.dimensions:
-        db.add(
-            DimensionScore(
-                analysis_id=analysis.id,
-                key=d["key"],
-                label=d["label"],
-                band=d["band"],
-                score=d["score"],
-                spread=d.get("spread", 0.0),
-                weight=d["weight"],
-                rationale=d["rationale"],
-                evidence_json=json.dumps(d["evidence"], ensure_ascii=False),
-                suggestions_json=json.dumps(d["suggestions"], ensure_ascii=False),
-            )
-        )
-    for expert in result.experts:
-        for d in expert["dimensions"]:
-            db.add(
-                ExpertScore(
-                    analysis_id=analysis.id,
-                    expert=expert["key"],
-                    key=d["key"],
-                    band=d["band"],
-                    score=d["score"],
-                    rationale=d["rationale"],
-                    evidence_json=json.dumps(d["evidence"], ensure_ascii=False),
-                    suggestions_json=json.dumps(d["suggestions"], ensure_ascii=False),
-                )
-            )
-    doc.status = "analyzed"
+    db.add(job)
     db.commit()
-    db.refresh(analysis)
-    return _analysis_out(db, analysis, lang)
+    db.refresh(job)
+
+    from app.workers import jobs as job_tasks
+    from app.workers.runner import run_job
+
+    run_job(job.id, job_tasks.run_analysis_task)
+    db.refresh(job)
+    return {"job_id": job.id, "status": job.status, "phase": job.phase}
 
 
 @router.get("/{doc_id}/analysis")
@@ -446,11 +402,35 @@ def rewrite_document(
     out_lang = doc.language if doc.language in ("zh", "en") else lang
     try:
         if payload.kind == "full":
+            expert_notes = ""
+            if analysis is not None:
+                from app.content.rubric import expert_label
+
+                adopt = payload.adopt or None
+                rows = (
+                    db.query(ExpertScore)
+                    .filter(ExpertScore.analysis_id == analysis.id)
+                    .all()
+                )
+                lines = [
+                    f"[{expert_label(r.expert, out_lang)}] {r.key}: {r.rationale}"
+                    for r in rows
+                    if not adopt or r.expert in adopt
+                ]
+                consensus = json.loads(analysis.consensus_json or "{}")
+                for item in consensus.get("must_fix", []) or []:
+                    lines.append(f"[must-fix] {item}")
+                expert_notes = "\n".join(lines)[:4000]
             res = rewrite_mod.rewrite_full(
                 provider, title=doc.title, content=doc.content, platform=doc.platform,
                 lang=out_lang, summary=analysis.summary if analysis else "",
+                expert_notes=expert_notes,
             )
-            content, meta = res.rewritten, {"changelog": res.changelog, "diff": res.diff}
+            content, meta = res.rewritten, {
+                "changelog": res.changelog,
+                "diff": res.diff,
+                "adopt": payload.adopt,
+            }
         elif payload.kind == "title":
             items = rewrite_mod.title_variants(
                 provider, title=doc.title, content=doc.content, platform=doc.platform, lang=out_lang
