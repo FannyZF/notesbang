@@ -55,6 +55,19 @@
     "export_docx": "导出 .docx",
     "export_txt": "导出 .txt",
     "new_analysis": "新分析",
-    "required": "请先登录。"
+    "required": "请先登录。",
+    "stage_reading": "正在阅读文案",
+    "stage_committee": "评审委员会评审中",
+    "stage_scoring": "汇总打分与共识",
+    "stage_writing": "生成修改建议",
+    "experts": "评审委员会",
+    "viewpoints": "专家观点",
+    "spread": "分歧度",
+    "consensus": "委员会共识",
+    "priorities": "优先修改",
+    "must_fix": "必改项",
+    "adopt": "采纳专家意见",
+    "adopt_hint": "勾选要在改写中采纳哪些专家的意见（默认全部）",
+    "radar": "专家评分雷达"
   }
 }

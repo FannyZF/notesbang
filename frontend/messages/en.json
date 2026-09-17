@@ -55,6 +55,19 @@
     "export_docx": "Export .docx",
     "export_txt": "Export .txt",
     "new_analysis": "New analysis",
-    "required": "Please sign in first."
+    "required": "Please sign in first.",
+    "stage_reading": "Reading your copy",
+    "stage_committee": "Committee reviewing",
+    "stage_scoring": "Scoring & consensus",
+    "stage_writing": "Writing suggestions",
+    "experts": "Review committee",
+    "viewpoints": "Expert views",
+    "spread": "Disagreement",
+    "consensus": "Consensus",
+    "priorities": "Top priorities",
+    "must_fix": "Must fix",
+    "adopt": "Adopt expert advice",
+    "adopt_hint": "Choose which experts' advice to apply in the rewrite (default: all)",
+    "radar": "Expert score profiles"
   }
 }

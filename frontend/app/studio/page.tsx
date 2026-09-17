@@ -2,25 +2,41 @@
 
 import { useCallback, useEffect, useState } from "react";
 import LanguageSwitcher from "../../components/LanguageSwitcher";
+import RadarChart from "../../components/RadarChart";
 import { useI18n } from "../../lib/i18n";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000/api";
 const MAX_CHARS = 3000;
+const PALETTE = ["#2563eb", "#db2777", "#16a34a", "#d97706", "#7c3aed"];
 
 type Platform = { key: string; label: string; dimensions?: { key: string; label: string }[] };
 type Evidence = { quote: string; location?: string; verified?: boolean };
 type Suggestion = { issue: string; fix: string; example: string; location?: string };
+type Viewpoint = { expert: string; label: string; rationale: string };
+type ExpertScorecard = {
+  key: string;
+  label: string;
+  overall: number;
+  dimensions: { key: string; band: number; score: number }[];
+};
 type Dimension = {
   key: string;
   label: string;
   band: number;
   score: number;
+  spread?: number;
   weight: number;
   rationale: string;
   evidence: Evidence[];
   suggestions: Suggestion[];
+  viewpoints?: Viewpoint[];
 };
 type DiffSegment = { op: "equal" | "insert" | "delete"; text: string };
+type Consensus = {
+  top_priorities?: { point: string; impact?: string }[];
+  disagreement?: { key: string; note: string }[];
+  must_fix?: string[];
+};
 type Scorecard = {
   id: number;
   document_id: number;
@@ -28,8 +44,8 @@ type Scorecard = {
   overall_score: number;
   summary: string;
   dimensions: Dimension[];
-  top_priorities?: { point: string; impact?: string }[];
-  compliance_flags?: { type: string; quote?: string; severity?: string }[];
+  experts?: ExpertScorecard[];
+  consensus?: Consensus;
 };
 type Doc = {
   id: number;
@@ -62,6 +78,9 @@ export default function StudioPage() {
   const [rewrite, setRewrite] = useState<{ kind: string; content: string; meta?: { diff?: DiffSegment[] } } | null>(null);
   const [focus, setFocus] = useState<string[]>([]);
   const [showDiff, setShowDiff] = useState(false);
+  const [jobPhase, setJobPhase] = useState("");
+  const [jobProgress, setJobProgress] = useState(0);
+  const [adopt, setAdopt] = useState<string[]>([]);
 
   const req = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -194,16 +213,47 @@ export default function StudioPage() {
     }
   };
 
+  const stageLabel = (phase: string) => {
+    if (/read/i.test(phase)) return t("studio.stage_reading");
+    if (/committee/i.test(phase)) return t("studio.stage_committee");
+    if (/scor|consensus/i.test(phase)) return t("studio.stage_scoring");
+    if (/writ|suggest/i.test(phase)) return t("studio.stage_writing");
+    return phase || t("studio.analyzing");
+  };
+
   const analyze = async () => {
     if (!current) return;
     setBusy(true);
     setNotice(null);
+    setCard(null);
+    setRewrite(null);
+    setJobPhase(t("studio.stage_reading"));
+    setJobProgress(2);
     try {
-      const c = (await req(
+      const start = (await req(
         `/documents/${current.id}/analyze?lang=${locale}&focus=${focus.join(",")}`,
         { method: "POST" }
-      )) as Scorecard;
+      )) as { job_id: number };
+      const deadline = Date.now() + 5 * 60 * 1000;
+      let status = "queued";
+      while (Date.now() < deadline) {
+        const job = (await req(`/jobs/${start.job_id}`)) as {
+          status: string;
+          phase: string;
+          progress: number;
+          error: string | null;
+        };
+        setJobProgress(job.progress);
+        if (job.phase) setJobPhase(job.phase);
+        status = job.status;
+        if (status === "succeeded") break;
+        if (status === "failed") throw new Error(job.error || "Analysis failed");
+        await new Promise((r) => setTimeout(r, 800));
+      }
+      if (status !== "succeeded") throw new Error("Timed out");
+      const c = (await req(`/documents/${current.id}/analysis?lang=${locale}`)) as Scorecard;
       setCard(c);
+      setAdopt((c.experts ?? []).map((e) => e.key));
     } catch (err) {
       const e = err as Error & { code?: string };
       setNotice({
@@ -238,7 +288,7 @@ export default function StudioPage() {
     try {
       const r = (await req(`/documents/${current.id}/rewrite?lang=${locale}`, {
         method: "POST",
-        body: JSON.stringify({ kind }),
+        body: JSON.stringify({ kind, adopt }),
       })) as { kind: string; content: string; meta?: { diff?: DiffSegment[] } };
       setRewrite(r);
       setShowDiff(kind === "full" && !!r.meta?.diff);
@@ -375,6 +425,46 @@ export default function StudioPage() {
             </div>
           </section>
 
+          {/* Committee progress */}
+          {busy && (
+            <section className="rounded-3xl border border-zinc-200/80 bg-white p-6">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium text-zinc-700">{stageLabel(jobPhase)}</span>
+                <span className="text-zinc-400">{jobProgress}%</span>
+              </div>
+              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-zinc-100">
+                <div
+                  className="h-full rounded-full bg-zinc-900 transition-all duration-500"
+                  style={{ width: `${jobProgress}%` }}
+                />
+              </div>
+              <ul className="mt-4 grid gap-1.5 text-xs">
+                {[
+                  { at: 5, key: "studio.stage_reading" },
+                  { at: 30, key: "studio.stage_committee" },
+                  { at: 80, key: "studio.stage_scoring" },
+                  { at: 90, key: "studio.stage_writing" },
+                ].map((s) => {
+                  const done = jobProgress >= s.at;
+                  const active = !done && jobProgress >= s.at - 30;
+                  return (
+                    <li key={s.key} className="flex items-center gap-2">
+                      <span className={done ? "text-emerald-500" : active ? "animate-pulse text-zinc-900" : "text-zinc-300"}>
+                        {done ? "✔" : active ? "●" : "○"}
+                      </span>
+                      <span className={done || active ? "text-zinc-600" : "text-zinc-300"}>
+                        {t(s.key)}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="mt-3 text-xs text-zinc-400">
+                {t("studio.experts")} · 5
+              </p>
+            </section>
+          )}
+
           {/* Scorecard */}
           {card && (
             <section className="rounded-3xl border border-zinc-200/80 bg-white p-6">
@@ -385,6 +475,73 @@ export default function StudioPage() {
                 </span>
               </div>
               {card.summary && <p className="mt-3 text-sm text-zinc-600">{card.summary}</p>}
+
+              {card.experts && card.experts.length > 0 && (
+                <div className="mt-6 rounded-2xl border border-zinc-200/80 p-4">
+                  <p className="text-xs font-medium text-zinc-400">{t("studio.radar")}</p>
+                  <RadarChart
+                    axes={card.dimensions.map((d) => d.label)}
+                    series={[
+                      ...card.experts.map((e, i) => ({
+                        label: e.label,
+                        color: PALETTE[i % PALETTE.length],
+                        values: card.dimensions.map((d) => {
+                          const m = e.dimensions.find((x) => x.key === d.key);
+                          return m ? m.score : 0;
+                        }),
+                      })),
+                      {
+                        label: "Committee",
+                        color: "#18181b",
+                        values: card.dimensions.map((d) => d.score),
+                      },
+                    ]}
+                  />
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
+                    {card.experts.map((e, i) => (
+                      <span key={e.key} className="flex items-center gap-1.5">
+                        <span
+                          className="inline-block h-2 w-2 rounded-full"
+                          style={{ background: PALETTE[i % PALETTE.length] }}
+                        />
+                        {e.label} · {e.overall}
+                      </span>
+                    ))}
+                    <span className="flex items-center gap-1.5 font-medium text-zinc-700">
+                      <span className="inline-block h-2 w-2 rounded-full bg-zinc-900" />
+                      Committee · {card.overall_score}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {card.consensus &&
+                ((card.consensus.top_priorities?.length ?? 0) > 0 ||
+                  (card.consensus.must_fix?.length ?? 0) > 0) && (
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div className="rounded-2xl bg-zinc-50/80 p-4">
+                      <p className="text-xs font-medium text-zinc-400">{t("studio.priorities")}</p>
+                      <ul className="mt-2 flex flex-col gap-1.5 text-sm text-zinc-600">
+                        {(card.consensus.top_priorities ?? []).map((p, i) => (
+                          <li key={i}>
+                            {p.impact ? `[${p.impact}] ` : ""}
+                            {p.point}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    {(card.consensus.must_fix?.length ?? 0) > 0 && (
+                      <div className="rounded-2xl bg-amber-50/70 p-4">
+                        <p className="text-xs font-medium text-amber-700">{t("studio.must_fix")}</p>
+                        <ul className="mt-2 flex flex-col gap-1.5 text-sm text-amber-800">
+                          {card.consensus.must_fix!.map((m, i) => (
+                            <li key={i}>{m}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 {[...card.dimensions]
                   .sort((a, b) => b.weight - a.weight)
@@ -395,6 +552,9 @@ export default function StudioPage() {
                       <span className="shrink-0 rounded-full bg-zinc-100 px-2.5 py-1 text-xs text-zinc-600">
                         {t("studio.score")} {d.score}/100 · {t("studio.band")} {d.band}/5 ·{" "}
                         {t("studio.weight")} {Math.round(d.weight * 100)}%
+                        {typeof d.spread === "number" && d.spread > 0
+                          ? ` · ${t("studio.spread")} ${d.spread}`
+                          : ""}
                       </span>
                     </div>
                     <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
@@ -424,6 +584,23 @@ export default function StudioPage() {
                         </ul>
                       </div>
                     )}
+                    {d.viewpoints && d.viewpoints.length > 0 && (
+                      <details className="mt-3">
+                        <summary className="cursor-pointer text-xs font-medium text-zinc-400 transition hover:text-zinc-600">
+                          {t("studio.viewpoints")}
+                        </summary>
+                        <ul className="mt-2 flex flex-col gap-2">
+                          {d.viewpoints.map((v) => (
+                            <li
+                              key={v.expert}
+                              className="rounded-lg border border-zinc-100 px-3 py-2 text-xs text-zinc-600"
+                            >
+                              <b>{v.label}</b>：{v.rationale}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
                   </div>
                 ))}
               </div>
@@ -433,6 +610,31 @@ export default function StudioPage() {
           {/* Rewrite */}
           {current && (
             <section className="rounded-3xl border border-zinc-200/80 bg-white p-6">
+              {card?.experts && card.experts.length > 0 && (
+                <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-zinc-400">{t("studio.adopt")}:</span>
+                  {card.experts.map((e) => (
+                    <button
+                      key={e.key}
+                      onClick={() =>
+                        setAdopt((prev) =>
+                          prev.includes(e.key)
+                            ? prev.filter((k) => k !== e.key)
+                            : [...prev, e.key]
+                        )
+                      }
+                      className={`rounded-full px-3 py-1 font-medium transition ${
+                        adopt.includes(e.key)
+                          ? "bg-zinc-900 text-white"
+                          : "border border-zinc-200 text-zinc-500 hover:bg-zinc-50"
+                      }`}
+                    >
+                      {e.label}
+                    </button>
+                  ))}
+                  <span className="text-zinc-300">{t("studio.adopt_hint")}</span>
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-2">
                 <button onClick={() => doRewrite("full")} disabled={busy} className="rounded-full bg-zinc-900 px-4 py-2 text-sm text-white disabled:opacity-40">
                   {t("studio.full_rewrite")}
