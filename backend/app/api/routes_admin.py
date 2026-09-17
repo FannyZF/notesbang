@@ -24,7 +24,7 @@ from app.models import (
     Entitlement,
     User,
 )
-from app.schemas import AdminBanIn, AdminPlanIn, AdminSettingsIn
+from app.schemas import AdminBanIn, AdminPlanIn, AdminSettingsIn, AdminTestEmailIn
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -150,6 +150,7 @@ def admin_get_settings(request: Request, db: Session = Depends(get_db)):
     _require_admin(request)
     settings = get_settings()
     cfg = runtime.llm_config(db)
+    mail = runtime.mail_config(db)
     overrides = {
         row.key: ("***" if row.key in runtime.SECRET_KEYS else row.value)
         for row in db.query(AppSetting).all()
@@ -165,6 +166,16 @@ def admin_get_settings(request: Request, db: Session = Depends(get_db)):
         "usd_to_cny": runtime.usd_to_cny(db),
         "cost_input_per_m": cfg["cost_input_per_m"],
         "cost_output_per_m": cfg["cost_output_per_m"],
+        "mail_driver": mail["mail_driver"],
+        "smtp_host": mail["smtp_host"],
+        "smtp_port": mail["smtp_port"],
+        "smtp_user": mail["smtp_user"],
+        "smtp_password_set": bool(mail["smtp_password"]),
+        "smtp_password_masked": runtime.mask_secret(mail["smtp_password"]),
+        "smtp_from": mail["smtp_from"],
+        "smtp_use_tls": mail["smtp_use_tls"],
+        "app_base_url": mail["app_base_url"],
+        "public_web_url": mail["public_web_url"],
         "overrides": overrides,
         "env": {
             "llm_provider": settings.llm_provider,
@@ -175,6 +186,14 @@ def admin_get_settings(request: Request, db: Session = Depends(get_db)):
             "usd_to_cny": settings.usd_to_cny,
             "cost_input_per_m": settings.cost_input_per_m,
             "cost_output_per_m": settings.cost_output_per_m,
+            "mail_driver": settings.mail_driver,
+            "smtp_host": settings.smtp_host,
+            "smtp_port": settings.smtp_port,
+            "smtp_user": settings.smtp_user,
+            "smtp_from": settings.smtp_from,
+            "smtp_use_tls": settings.smtp_use_tls,
+            "app_base_url": settings.app_base_url,
+            "public_web_url": settings.public_web_url,
         },
     }
 
@@ -215,6 +234,27 @@ def admin_update_settings(
         runtime.set_setting(db, key, str(value).strip())
     db.commit()
     return admin_get_settings(request, db)
+
+
+@router.post("/smtp/test")
+def admin_test_email(
+    payload: AdminTestEmailIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Send a probe email using the current (runtime) SMTP settings."""
+    _require_admin(request)
+    from app.services.mail import send_test_email
+
+    try:
+        result = send_test_email(get_settings(), payload.to)
+    except Exception as exc:  # noqa: BLE001 - surface SMTP errors to the admin
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            detail=f"SMTP send failed: {exc}",
+            headers={"X-Error-Code": "SMTP_SEND_FAILED"},
+        ) from exc
+    return {**result, "to": payload.to}
 
 
 @router.post("/users/{user_id}/plan")

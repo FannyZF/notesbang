@@ -119,6 +119,49 @@ def test_admin_settings_override_free_limit(client):
         os.environ.pop("ADMIN_TOKEN", None)
 
 
+def test_admin_smtp_settings_and_test_email(client):
+    os.environ["ADMIN_TOKEN"] = "test-admin-token"
+    try:
+        r = client.put(
+            "/api/admin/settings",
+            headers=_admin_headers(),
+            json={
+                "mail_driver": "smtp",
+                "smtp_host": "smtp.example.com",
+                "smtp_port": 465,
+                "smtp_user": "mailer",
+                "smtp_password": "super-secret",
+                "smtp_from": "no-reply@example.com",
+                "smtp_use_tls": True,
+                "app_base_url": "https://api.example.com",
+            },
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["smtp_host"] == "smtp.example.com"
+        assert body["smtp_port"] == 465
+        assert body["smtp_use_tls"] is True
+        assert body["smtp_password_set"] is True
+        assert "super-secret" not in body["smtp_password_masked"]
+        assert body["overrides"]["smtp_password"] == "***"
+
+        # Switch back to console so the probe does not attempt a real connection.
+        client.put(
+            "/api/admin/settings",
+            headers=_admin_headers(),
+            json={"mail_driver": "console"},
+        )
+        probe = client.post(
+            "/api/admin/smtp/test",
+            headers=_admin_headers(),
+            json={"to": "admin@example.com"},
+        )
+        assert probe.status_code == 200, probe.text
+        assert probe.json()["driver"] == "console"
+    finally:
+        os.environ.pop("ADMIN_TOKEN", None)
+
+
 def test_admin_users_report_usage(client):
     os.environ["ADMIN_TOKEN"] = "test-admin-token"
     try:

@@ -42,6 +42,16 @@ type Settings = {
   usd_to_cny: number;
   cost_input_per_m: number;
   cost_output_per_m: number;
+  mail_driver: string;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_user: string;
+  smtp_password_set: boolean;
+  smtp_password_masked: string;
+  smtp_from: string;
+  smtp_use_tls: boolean;
+  app_base_url: string;
+  public_web_url: string;
 };
 type SettingsForm = {
   llm_provider: string;
@@ -52,6 +62,15 @@ type SettingsForm = {
   usd_to_cny: string;
   cost_input_per_m: string;
   cost_output_per_m: string;
+  mail_driver: string;
+  smtp_host: string;
+  smtp_port: string;
+  smtp_user: string;
+  smtp_password: string;
+  smtp_from: string;
+  smtp_use_tls: string;
+  app_base_url: string;
+  public_web_url: string;
 };
 
 export default function AdminPage() {
@@ -68,6 +87,8 @@ export default function AdminPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testTo, setTestTo] = useState("");
 
   const headers = useMemo(
     () => (token ? ({ Authorization: `Bearer ${token}` } as Record<string, string>) : undefined),
@@ -101,6 +122,15 @@ export default function AdminPage() {
         usd_to_cny: String(cfgData.usd_to_cny),
         cost_input_per_m: String(cfgData.cost_input_per_m),
         cost_output_per_m: String(cfgData.cost_output_per_m),
+        mail_driver: cfgData.mail_driver,
+        smtp_host: cfgData.smtp_host,
+        smtp_port: String(cfgData.smtp_port),
+        smtp_user: cfgData.smtp_user,
+        smtp_password: "",
+        smtp_from: cfgData.smtp_from,
+        smtp_use_tls: cfgData.smtp_use_tls ? "true" : "false",
+        app_base_url: cfgData.app_base_url,
+        public_web_url: cfgData.public_web_url,
       });
     } catch (err) {
       setError(errMessage(err));
@@ -124,7 +154,7 @@ export default function AdminPage() {
     setError(null);
     setNotice(null);
     try {
-      const payload: Record<string, string | number> = {
+      const payload: Record<string, string | number | boolean> = {
         llm_provider: form.llm_provider,
         llm_model: form.llm_model,
         llm_base_url: form.llm_base_url,
@@ -132,8 +162,17 @@ export default function AdminPage() {
         usd_to_cny: Number(form.usd_to_cny),
         cost_input_per_m: Number(form.cost_input_per_m),
         cost_output_per_m: Number(form.cost_output_per_m),
+        mail_driver: form.mail_driver,
+        smtp_host: form.smtp_host,
+        smtp_port: Number(form.smtp_port),
+        smtp_user: form.smtp_user,
+        smtp_from: form.smtp_from,
+        smtp_use_tls: form.smtp_use_tls === "true",
+        app_base_url: form.app_base_url,
+        public_web_url: form.public_web_url,
       };
       if (form.llm_api_key.trim()) payload.llm_api_key = form.llm_api_key.trim();
+      if (form.smtp_password.trim()) payload.smtp_password = form.smtp_password.trim();
       const r = await fetch(`${API_BASE}/admin/settings`, {
         method: "PUT",
         headers: { ...(headers ?? {}), "Content-Type": "application/json" },
@@ -146,6 +185,28 @@ export default function AdminPage() {
       setError(errMessage(err));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const sendTestEmail = async () => {
+    const to = testTo.trim();
+    if (!to) return;
+    setTesting(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const r = await fetch(`${API_BASE}/admin/smtp/test`, {
+        method: "POST",
+        headers: { ...(headers ?? {}), "Content-Type": "application/json" },
+        body: JSON.stringify({ to }),
+      });
+      if (!r.ok) throw new Error(`Test ${r.status}: ${(await r.text()).slice(0, 300)}`);
+      const body = (await r.json()) as { driver: string };
+      setNotice(`Test email sent (driver=${body.driver}) → ${to}`);
+    } catch (err) {
+      setError(errMessage(err));
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -306,7 +367,73 @@ export default function AdminPage() {
             {field("usd_to_cny", "USD → CNY rate", { type: "number", step: "0.01" })}
             {field("cost_input_per_m", "Cost $/M input tokens", { type: "number", step: "0.0001" })}
             {field("cost_output_per_m", "Cost $/M output tokens", { type: "number", step: "0.0001" })}
-            <div className="flex items-end">
+
+            <div className="col-span-full mt-2 border-t border-zinc-100 pt-3 text-xs font-medium text-zinc-500">
+              Email / SMTP
+              <span className="ml-2 font-normal text-zinc-400">
+                {settings.mail_driver === "smtp"
+                  ? settings.smtp_password_set
+                    ? `password: ${settings.smtp_password_masked}`
+                    : "password: not set"
+                  : "driver: console (links printed to server log)"}
+              </span>
+            </div>
+            <label className="flex flex-col gap-1 text-xs text-zinc-500">
+              Mail driver
+              <select
+                className="rounded-xl border border-zinc-200 px-3 py-2 text-sm text-zinc-800"
+                value={form.mail_driver}
+                onChange={(e) => setForm({ ...form, mail_driver: e.target.value })}
+              >
+                <option value="console">console (dev, log only)</option>
+                <option value="smtp">smtp</option>
+              </select>
+            </label>
+            {field("smtp_host", "SMTP host", { placeholder: "smtp.example.com" })}
+            {field("smtp_port", "SMTP port", { type: "number" })}
+            {field("smtp_user", "SMTP username")}
+            {field("smtp_password", "SMTP password (leave blank to keep)", {
+              type: "password",
+              placeholder: settings.smtp_password_set ? "•••••••• (unchanged)" : "",
+            })}
+            {field("smtp_from", "From address", { placeholder: "no-reply@example.com" })}
+            <label className="flex flex-col gap-1 text-xs text-zinc-500">
+              STARTTLS
+              <select
+                className="rounded-xl border border-zinc-200 px-3 py-2 text-sm text-zinc-800"
+                value={form.smtp_use_tls}
+                onChange={(e) => setForm({ ...form, smtp_use_tls: e.target.value })}
+              >
+                <option value="true">enabled (587)</option>
+                <option value="false">disabled (25)</option>
+              </select>
+            </label>
+            {field("app_base_url", "API base URL (email links)", { placeholder: "https://api.example.com" })}
+            {field("public_web_url", "Web base URL", { placeholder: "https://example.com" })}
+
+            <div className="col-span-full flex flex-wrap items-end gap-2 border-t border-zinc-100 pt-3">
+              <label className="flex flex-col gap-1 text-xs text-zinc-500">
+                Test recipient
+                <input
+                  className="w-64 rounded-xl border border-zinc-200 px-3 py-2 text-sm text-zinc-800"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={testTo}
+                  onChange={(e) => setTestTo(e.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void sendTestEmail()}
+                disabled={testing || !testTo.trim()}
+                className="rounded-full border border-zinc-200 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
+              >
+                {testing ? "Sending…" : "Send test email"}
+              </button>
+              <span className="text-xs text-zinc-400">Save settings first, then send a test.</span>
+            </div>
+
+            <div className="col-span-full flex items-end">
               <button
                 className="rounded-full bg-zinc-900 px-5 py-2 text-sm font-medium text-white disabled:opacity-50"
                 disabled={saving}

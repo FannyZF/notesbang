@@ -24,10 +24,19 @@ EDITABLE_KEYS = frozenset(
         "usd_to_cny",
         "cost_input_per_m",
         "cost_output_per_m",
+        "mail_driver",
+        "smtp_host",
+        "smtp_port",
+        "smtp_user",
+        "smtp_password",
+        "smtp_from",
+        "smtp_use_tls",
+        "app_base_url",
+        "public_web_url",
     }
 )
 
-SECRET_KEYS = frozenset({"llm_api_key"})
+SECRET_KEYS = frozenset({"llm_api_key", "smtp_password"})
 
 
 def get_setting(db: Session, key: str) -> str | None:
@@ -85,9 +94,34 @@ def llm_config(db: Session) -> dict:
     }
 
 
+def _get_bool(db: Session, key: str, default: bool) -> bool:
+    raw = get_setting(db, key)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
 def mask_secret(value: str) -> str:
     if not value:
         return ""
     if len(value) <= 8:
         return "*" * len(value)
     return f"{value[:4]}{'*' * 8}{value[-4:]}"
+
+
+def mail_config(db: Session) -> dict:
+    """Effective mail/SMTP configuration (runtime override else env default)."""
+    settings = get_settings()
+    return {
+        "mail_driver": (get_setting(db, "mail_driver") or settings.mail_driver).strip(),
+        "smtp_host": (get_setting(db, "smtp_host") or settings.smtp_host).strip(),
+        "smtp_port": _get_int(db, "smtp_port", settings.smtp_port),
+        "smtp_user": (get_setting(db, "smtp_user") or settings.smtp_user).strip(),
+        "smtp_password": (get_setting(db, "smtp_password") or settings.smtp_password),
+        "smtp_from": (get_setting(db, "smtp_from") or settings.smtp_from).strip(),
+        "smtp_use_tls": _get_bool(db, "smtp_use_tls", settings.smtp_use_tls),
+        "app_base_url": (get_setting(db, "app_base_url") or settings.app_base_url).rstrip("/"),
+        "public_web_url": (
+            get_setting(db, "public_web_url") or settings.public_web_url
+        ).rstrip("/"),
+    }

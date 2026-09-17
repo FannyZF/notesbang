@@ -58,6 +58,19 @@ class AdminSettingsIn(BaseModel):
     usd_to_cny: float | None = Field(default=None, ge=0)
     cost_input_per_m: float | None = Field(default=None, ge=0)
     cost_output_per_m: float | None = Field(default=None, ge=0)
+    mail_driver: str | None = Field(default=None, pattern="^(console|smtp)$")
+    smtp_host: str | None = Field(default=None, max_length=256)
+    smtp_port: int | None = Field(default=None, ge=1, le=65535)
+    smtp_user: str | None = Field(default=None, max_length=256)
+    smtp_password: str | None = Field(default=None, max_length=256)
+    smtp_from: str | None = Field(default=None, max_length=256)
+    smtp_use_tls: bool | None = None
+    app_base_url: str | None = Field(default=None, max_length=256)
+    public_web_url: str | None = Field(default=None, max_length=256)
+
+
+class AdminTestEmailIn(BaseModel):
+    to: EmailStr
 
 
 class AdminPlanIn(BaseModel):
