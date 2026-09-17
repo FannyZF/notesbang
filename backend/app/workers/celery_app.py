@@ -17,6 +17,8 @@ celery_app = Celery(
     "notesbang",
     broker=settings.redis_url or "memory://",
     backend=None,
+    # Imported when the worker/beat starts so task names are registered.
+    include=["app.workers.celery_tasks"],
 )
 celery_app.conf.update(
     task_ignore_result=True,

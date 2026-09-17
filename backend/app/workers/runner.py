@@ -43,6 +43,12 @@ def run_job(job_id: int, task_fn: Callable[[SessionLocal, Job], None]) -> None:
         from app.workers.celery_app import celery_app
 
         name = f"jobs.{task_fn.__name__}"
+        if name not in celery_app.tasks:
+            # Fail loudly instead of leaving the job stuck in "queued".
+            raise RuntimeError(
+                f"Celery task {name!r} is not registered; add it to "
+                "app/workers/celery_tasks.py"
+            )
         eager = os.getenv("CELERY_EAGER", "false").lower() in ("1", "true", "yes")
         if eager:
             # send_task ignores task_always_eager; invoke the registered task.
@@ -51,12 +57,17 @@ def run_job(job_id: int, task_fn: Callable[[SessionLocal, Job], None]) -> None:
             celery_app.send_task(name, args=[job_id])
         return
     if _is_async():
-        _pool().submit(_work, job_id, task_fn)
+        _pool().submit(execute_job, job_id, task_fn)
     else:
-        _work(job_id, task_fn)
+        execute_job(job_id, task_fn)
 
 
-def _work(job_id: int, task_fn: Callable[[SessionLocal, Job], None]) -> None:
+def execute_job(job_id: int, task_fn: Callable[[SessionLocal, Job], None]) -> None:
+    """Run a job body once, persisting running/succeeded/failed state.
+
+    Shared by the thread executor and the Celery task so both backends behave
+    identically.
+    """
     db = SessionLocal()
     job: Job | None = None
     try:
