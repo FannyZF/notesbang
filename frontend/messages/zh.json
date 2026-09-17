@@ -17,7 +17,7 @@
   },
   "studio": {
     "tagline": "为你的发布平台，给文案打分并改写。",
-    "free_quota": "免费：每天 5 次分析",
+    "free_quota": "免费：每天 {limit} 次分析",
     "sign_in_first": "登录后即可分析与改写。",
     "title_label": "标题",
     "title_placeholder": "可选标题",
@@ -28,7 +28,7 @@
     "analyze": "开始分析",
     "analyzing": "分析中…",
     "consent": "允许匿名使用我的文案来改进服务",
-    "limit_reached": "今日免费额度已用完（每天 5 次），请明天再来。",
+    "limit_reached": "今日免费额度已用完（每天 {limit} 次），请明天再来。",
     "too_long": "内容超过 3000 字。",
     "scorecard": "评分卡",
     "overall": "总分",

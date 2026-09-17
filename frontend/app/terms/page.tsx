@@ -1,12 +1,13 @@
 "use client";
 
 import LanguageSwitcher from "../../components/LanguageSwitcher";
+import { FREE_DAILY_LIMIT } from "../../lib/config";
 import { useI18n } from "../../lib/i18n";
 
 const SECTIONS = {
   en: [
     ["1. The service", "NotesBang scores and rewrites text you provide (pasted, .docx, .txt, .md), using third-party AI models. By using the service you agree to these terms."],
-    ["2. Accounts & free usage", "You need an account with a verified email. During early access the service is free, limited to 5 analyses per day per account and 3000 characters per piece. Accounts created to abuse the free tier may be suspended."],
+    ["2. Accounts & free usage", `You need an account with a verified email. During early access the service is free, limited to ${FREE_DAILY_LIMIT} analyses per day per account and 3000 characters per piece. Accounts created to abuse the free tier may be suspended.`],
     ["3. Your content & AI processing", "You keep ownership of your text. To score and rewrite it, the content is sent to a third-party AI model for processing. You confirm you have the right to process the content and that it is lawful."],
     ["4. Data used to improve the service", "By default, your anonymized copy and its scores help us learn what makes copy effective. You can turn this off per document or at any time; see the Privacy Policy."],
     ["5. Acceptable use", "Do not upload unlawful or infringing material, attempt unauthorized access, overload the service, or use it to produce defamatory or hateful content."],
@@ -16,7 +17,7 @@ const SECTIONS = {
   ],
   zh: [
     ["1. 服务内容", "NotesBang 使用第三方 AI 模型，对你提供的文本（粘贴、.docx、.txt、.md）进行评分与改写。使用本服务即表示你同意本条款。"],
-    ["2. 账号与免费使用", "你需要一个已验证邮箱的账号。早期体验期免费，限制为每账号每天 5 次分析、单篇不超过 3000 字。滥用免费额度的账号可能被暂停。"],
+    ["2. 账号与免费使用", `你需要一个已验证邮箱的账号。早期体验期免费，限制为每账号每天 ${FREE_DAILY_LIMIT} 次分析、单篇不超过 3000 字。滥用免费额度的账号可能被暂停。`],
     ["3. 你的内容与 AI 处理", "你保留文本的所有权。为进行评分与改写，内容会发送给第三方 AI 模型处理。你确认有权处理该内容且内容合法。"],
     ["4. 用于改进服务的数据", "默认情况下，你的匿名文案及其评分会帮助我们总结“什么样的文案更有效”。你可以对单篇或随时关闭；详见隐私政策。"],
     ["5. 可接受使用", "请勿上传违法或侵权内容、尝试未授权访问、滥用或过载服务，或用其生成诽谤、仇恨等违规内容。"],

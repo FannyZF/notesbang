@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import { FREE_DAILY_LIMIT } from "../lib/config";
 import { useI18n } from "../lib/i18n";
 
 type Copy = {
@@ -44,7 +45,7 @@ const COPY: Record<"en" | "zh", Copy> = {
         { t: "Actionable suggestions", b: "Issue → fix → a ready-to-paste example for each dimension." },
         { t: "Full rewrite + variants", b: "Get a rewritten piece plus 5 titles and 3 opening hooks." },
         { t: "Export anywhere", b: "Download the scorecard and rewrite as Markdown, Word or plain text." },
-        { t: "Free to start", b: "5 analyses per day, up to 3000 characters each. No card needed." },
+        { t: "Free to start", b: `${FREE_DAILY_LIMIT} analyses per day, up to 3000 characters each. No card needed.` },
       ],
     },
     how: {
@@ -60,7 +61,7 @@ const COPY: Record<"en" | "zh", Copy> = {
       title: "Free during early access.",
       sub: "Help us learn what makes copy work — and get your analysis free.",
       bullets: [
-        "5 analyses per day, up to 3000 characters each",
+        `${FREE_DAILY_LIMIT} analyses per day, up to 3000 characters each`,
         "No credit card required",
         "Your copy is used (anonymized) to improve the service — you can opt out anytime",
       ],
@@ -73,7 +74,7 @@ const COPY: Record<"en" | "zh", Copy> = {
         { q: "Is there an 'AI probability' score?", a: "No. AI-text detection is unreliable, so we removed it. Instead we score things you can act on: hook, title, rhythm, emotion, social currency and interaction." },
         { q: "Will you use my copy?", a: "By default your anonymized copy helps us learn what works; you can turn this off per document or any time. See the Privacy Policy." },
         { q: "Does it work in Chinese and English?", a: "Yes — the UI and the scoring support both, and the output follows your copy's language." },
-        { q: "Is it really free?", a: "Yes, during early access: 5 analyses per day per account, no card required." },
+        { q: "Is it really free?", a: `Yes, during early access: ${FREE_DAILY_LIMIT} analyses per day per account, no card required.` },
       ],
     },
     cta: { title: "Your next piece deserves a second pair of eyes.", sub: "Score it free, see the reasons, ship a better version.", button: "Open Studio" },
@@ -106,7 +107,7 @@ const COPY: Record<"en" | "zh", Copy> = {
         { t: "可执行的建议", b: "每个维度给出：问题 → 怎么改 → 可直接粘贴的示例。" },
         { t: "整篇改写 + 多版本", b: "一篇改写稿，外加 5 个标题与 3 个开头备选。" },
         { t: "随手导出", b: "评分卡与改写稿可导出 Markdown、Word 或纯文本。" },
-        { t: "免费开始", b: "每天 5 次分析，单篇不超过 3000 字，无需绑卡。" },
+        { t: "免费开始", b: `每天 ${FREE_DAILY_LIMIT} 次分析，单篇不超过 3000 字，无需绑卡。` },
       ],
     },
     how: {
@@ -122,7 +123,7 @@ const COPY: Record<"en" | "zh", Copy> = {
       title: "早期体验期，完全免费。",
       sub: "帮我们一起摸清“什么样的文案有效”，你的分析免费。",
       bullets: [
-        "每天 5 次分析，单篇不超过 3000 字",
+        `每天 ${FREE_DAILY_LIMIT} 次分析，单篇不超过 3000 字`,
         "无需绑定信用卡",
         "你的文案会以匿名方式用于改进服务，可随时关闭",
       ],
@@ -135,7 +136,7 @@ const COPY: Record<"en" | "zh", Copy> = {
         { q: "为什么没有“AI 撰写概率”？", a: "AI 文本检测并不可靠，所以去掉了。我们只评你可以改进的维度：钩子、标题、节奏、情绪、社交货币与互动。" },
         { q: "会用我的文案吗？", a: "默认会以匿名方式用于改进服务，你可以对单篇或随时关闭。详见隐私政策。" },
         { q: "中英文都支持吗？", a: "支持——界面与评分都兼容中英文，输出语言跟随你的文案。" },
-        { q: "真的免费吗？", a: "早期体验期免费：每账号每天 5 次分析，无需绑卡。" },
+        { q: "真的免费吗？", a: `早期体验期免费：每账号每天 ${FREE_DAILY_LIMIT} 次分析，无需绑卡。` },
       ],
     },
     cta: { title: "你的下一篇文案，值得再被看一遍。", sub: "免费评分，看清理由，交付更好的版本。", button: "打开工作台" },

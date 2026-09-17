@@ -23,6 +23,9 @@ Stop-Port $WebPort
 Start-Sleep -Milliseconds 800
 
 # 2) ensure the frontend production build exists
+if (-not $env:NEXT_PUBLIC_API_BASE) { $env:NEXT_PUBLIC_API_BASE = "http://localhost:$ApiPort/api" }
+if (-not $env:NEXT_PUBLIC_FREE_DAILY_LIMIT) { $env:NEXT_PUBLIC_FREE_DAILY_LIMIT = if ($env:FREE_DAILY_LIMIT) { $env:FREE_DAILY_LIMIT } else { "3" } }
+if (-not $env:NEXT_PUBLIC_MAX_CONTENT_CHARS) { $env:NEXT_PUBLIC_MAX_CONTENT_CHARS = if ($env:CONTENT_MAX_CHARS) { $env:CONTENT_MAX_CHARS } else { "3000" } }
 $buildId = Join-Path $Root "frontend\.next\BUILD_ID"
 if (-not (Test-Path $buildId)) {
   Write-Host "Building frontend (first deploy) ..."
@@ -58,7 +61,6 @@ Start-Process -FilePath $py -ArgumentList "-m","uvicorn","app.main:app","--host"
 # 5) start frontend (Next.js production server)
 $webOut = Join-Path $Log "sn-web.out.log"
 $webErr = Join-Path $Log "sn-web.err.log"
-if (-not $env:NEXT_PUBLIC_API_BASE) { $env:NEXT_PUBLIC_API_BASE = "http://localhost:$ApiPort/api" }
 Start-Process -FilePath "cmd.exe" -ArgumentList "/c","npm run start -- -p $WebPort" -WorkingDirectory (Join-Path $Root "frontend") -RedirectStandardOutput $webOut -RedirectStandardError $webErr -WindowStyle Hidden | Out-Null
 
 # 6) wait + verify

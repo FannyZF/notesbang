@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import LanguageSwitcher from "../../components/LanguageSwitcher";
 import RadarChart from "../../components/RadarChart";
+import { FREE_DAILY_LIMIT, MAX_CONTENT_CHARS } from "../../lib/config";
 import { useI18n } from "../../lib/i18n";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000/api";
-const MAX_CHARS = 3000;
+const MAX_CHARS = MAX_CONTENT_CHARS;
 const PALETTE = ["#2563eb", "#db2777", "#16a34a", "#d97706", "#7c3aed"];
 
 type Platform = {
@@ -367,7 +368,9 @@ export default function StudioPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{t("common.app_name")} · Studio</h1>
           <p className="text-sm text-zinc-500">{t("studio.tagline")}</p>
-          <p className="text-xs text-zinc-400">{t("studio.free_quota")}</p>
+          <p className="text-xs text-zinc-400">
+            {t("studio.free_quota", { limit: quota?.limit ?? FREE_DAILY_LIMIT })}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <LanguageSwitcher />
