@@ -36,7 +36,10 @@ def _require_admin(request: Request) -> None:
     if not expected:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Admin not configured",
+            detail=(
+                "Admin not configured: set ADMIN_TOKEN in .env and recreate "
+                "the api container (docker compose up -d api)"
+            ),
             headers={"X-Error-Code": "ADMIN_NOT_CONFIGURED"},
         )
     if supplied != expected:

@@ -1,6 +1,8 @@
 """FastAPI application entrypoint."""
 from __future__ import annotations
 
+import logging
+import os
 import time
 from contextlib import asynccontextmanager
 
@@ -30,6 +32,11 @@ init_sentry()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if not os.getenv("ADMIN_TOKEN", "").strip():
+        logging.getLogger("app").warning(
+            "ADMIN_TOKEN is empty: /api/admin/* returns 503 and the /admin "
+            "console cannot be used. Set it in .env and recreate the container."
+        )
     init_db()
     yield
 
