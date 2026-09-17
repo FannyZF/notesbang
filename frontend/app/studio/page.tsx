@@ -71,7 +71,11 @@ export default function StudioPage() {
   const [token, setToken] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [authStep, setAuthStep] = useState<"form" | "verify">("form");
+  const [pendingEmail, setPendingEmail] = useState("");
+  const [devVerifyUrl, setDevVerifyUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
@@ -152,19 +156,35 @@ export default function StudioPage() {
     })();
   }, [token, locale, req, refreshDocs]);
 
+  const localizeAuthError = (err: unknown) => {
+    const e = err as Error & { code?: string };
+    if (e.code === "EMAIL_NOT_VERIFIED") return t("auth.err_not_verified");
+    const d = e.message ?? "";
+    if (/already registered/i.test(d)) return t("auth.err_email_taken");
+    if (/invalid credentials/i.test(d)) return t("auth.err_bad_credentials");
+    if (/rate/i.test(d)) return t("auth.err_rate");
+    if (/password/i.test(d) && /8|short|least/i.test(d)) return t("auth.err_weak_password");
+    return d;
+  };
+
   const doAuth = async () => {
     setBusy(true);
     setNotice(null);
     try {
       if (authMode === "register") {
+        if (password !== confirmPassword) {
+          setNotice({ kind: "err", text: t("auth.err_password_mismatch") });
+          return;
+        }
         const r = (await req("/auth/register", {
           method: "POST",
           body: JSON.stringify({ email, password }),
         })) as { dev_verify_url: string | null };
-        if (r.dev_verify_url) {
-          const tok = new URL(r.dev_verify_url).searchParams.get("token");
-          if (tok) await req(`/auth/verify?token=${encodeURIComponent(tok)}`);
-        }
+        setPendingEmail(email);
+        setDevVerifyUrl(r.dev_verify_url ?? null);
+        setAuthStep("verify");
+        setNotice({ kind: "ok", text: t("auth.verify_sent", { email }) });
+        return;
       }
       const l = (await req("/auth/login", {
         method: "POST",
@@ -173,9 +193,42 @@ export default function StudioPage() {
       window.localStorage.setItem("nb_token", l.token);
       setToken(l.token);
     } catch (err) {
-      setNotice({ kind: "err", text: errMessage(err) });
+      const code = (err as Error & { code?: string }).code;
+      if (code === "EMAIL_NOT_VERIFIED") {
+        setPendingEmail(email);
+        setDevVerifyUrl(null);
+        setAuthStep("verify");
+      }
+      setNotice({ kind: "err", text: localizeAuthError(err) });
     } finally {
       setBusy(false);
+    }
+  };
+
+  const resendVerification = async () => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const r = (await req("/auth/resend-verification-email", {
+        method: "POST",
+        body: JSON.stringify({ email: pendingEmail || email }),
+      })) as { dev_verify_url: string | null };
+      setDevVerifyUrl(r.dev_verify_url ?? null);
+      setNotice({ kind: "ok", text: t("auth.resent") });
+    } catch (err) {
+      setNotice({ kind: "err", text: localizeAuthError(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openDevVerify = () => {
+    if (!devVerifyUrl) return;
+    try {
+      const tok = new URL(devVerifyUrl).searchParams.get("token");
+      window.location.href = tok ? `/verify?token=${encodeURIComponent(tok)}` : devVerifyUrl;
+    } catch {
+      window.location.href = devVerifyUrl;
     }
   };
 
@@ -390,20 +443,112 @@ export default function StudioPage() {
 
       {!token ? (
         <section className="mx-auto w-full max-w-md rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-sm">
-          <div className="flex rounded-full bg-zinc-100 p-1 text-sm font-medium">
-            {(["login", "register"] as const).map((m) => (
-              <button key={m} onClick={() => setAuthMode(m)} className={`flex-1 rounded-full px-4 py-2 transition ${authMode === m ? "bg-white shadow-sm" : "text-zinc-500"}`}>
-                {m === "login" ? t("common.login") : t("common.register")}
+          {authStep === "verify" ? (
+            <div className="flex flex-col gap-3 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-2xl">
+                ✉
+              </div>
+              <h1 className="text-lg font-semibold">{t("auth.verify_title")}</h1>
+              <p className="text-sm text-zinc-500">
+                {t("auth.verify_sent", { email: pendingEmail || email })}
+              </p>
+              <p className="text-xs text-zinc-400">{t("auth.verify_body")}</p>
+              {devVerifyUrl && (
+                <button
+                  onClick={openDevVerify}
+                  className="rounded-full border border-dashed border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-700"
+                >
+                  {t("auth.dev_open")}
+                </button>
+              )}
+              <button
+                onClick={resendVerification}
+                disabled={busy}
+                className="rounded-full border border-zinc-200 px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
+              >
+                {t("auth.resend")}
               </button>
-            ))}
-          </div>
-          <div className="mt-4 flex flex-col gap-3">
-            <input className="rounded-xl border border-zinc-200 px-3.5 py-2.5" type="email" placeholder={t("common.email")} value={email} onChange={(e) => setEmail(e.target.value)} />
-            <input className="rounded-xl border border-zinc-200 px-3.5 py-2.5" type="password" placeholder={t("common.password")} value={password} onChange={(e) => setPassword(e.target.value)} />
-            <button onClick={doAuth} disabled={busy} className="rounded-full bg-zinc-900 px-5 py-3 text-white disabled:opacity-50">
-              {authMode === "login" ? t("common.login") : t("common.register")}
-            </button>
-          </div>
+              <button
+                onClick={() => {
+                  setAuthStep("form");
+                  setAuthMode("login");
+                  setNotice(null);
+                }}
+                className="rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white"
+              >
+                {t("auth.already_done")}
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="text-center">
+                <h1 className="text-lg font-semibold">
+                  {authMode === "login" ? t("auth.welcome_back") : t("auth.create_title")}
+                </h1>
+                <p className="mt-1 text-sm text-zinc-500">
+                  {authMode === "login" ? t("auth.welcome_back_sub") : t("auth.create_sub")}
+                </p>
+              </div>
+              <div className="mt-4 flex rounded-full bg-zinc-100 p-1 text-sm font-medium">
+                {(["login", "register"] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => {
+                      setAuthMode(m);
+                      setNotice(null);
+                    }}
+                    className={`flex-1 rounded-full px-4 py-2 transition ${authMode === m ? "bg-white shadow-sm" : "text-zinc-500"}`}
+                  >
+                    {m === "login" ? t("common.login") : t("common.register")}
+                  </button>
+                ))}
+              </div>
+              <form
+                className="mt-4 flex flex-col gap-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void doAuth();
+                }}
+              >
+                <input
+                  className="rounded-xl border border-zinc-200 px-3.5 py-2.5"
+                  type="email"
+                  autoComplete="email"
+                  placeholder={t("common.email")}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+                <input
+                  className="rounded-xl border border-zinc-200 px-3.5 py-2.5"
+                  type="password"
+                  autoComplete={authMode === "login" ? "current-password" : "new-password"}
+                  placeholder={t("common.password")}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                {authMode === "register" && (
+                  <>
+                    <input
+                      className="rounded-xl border border-zinc-200 px-3.5 py-2.5"
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder={t("auth.confirm_password")}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                    <p className="text-xs leading-relaxed text-zinc-400">{t("auth.register_note")}</p>
+                  </>
+                )}
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="rounded-full bg-zinc-900 px-5 py-3 text-white disabled:opacity-50"
+                >
+                  {authMode === "login" ? t("common.login") : t("common.register")}
+                </button>
+              </form>
+            </>
+          )}
         </section>
       ) : (
         <div className="flex flex-col gap-6">

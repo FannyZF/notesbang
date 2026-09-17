@@ -26,6 +26,7 @@ from app.schemas import (
     PreferencesIn,
     RegisterIn,
     RegisterOut,
+    ResendVerificationIn,
     ResetIn,
     UserOut,
 )
@@ -139,6 +140,12 @@ def login(
             status.HTTP_403_FORBIDDEN,
             detail="Account suspended",
             headers={"X-Error-Code": "ACCOUNT_BANNED"},
+        )
+    if not user.email_verified:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail="Email not verified",
+            headers={"X-Error-Code": "EMAIL_NOT_VERIFIED"},
         )
     token = new_token()
     db.add(ApiSession(user_id=user.id, token_digest=token_digest(token)))
@@ -350,6 +357,39 @@ def resend_verification(
     )
     db.commit()
     dev_url = send_verification_link(settings, user.email, token, user.locale)
+    return {"ok": True, "dev_verify_url": dev_url}
+
+
+@router.post("/resend-verification-email")
+def resend_verification_email(
+    payload: ResendVerificationIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Public resend by email (used before the first successful login).
+
+    The response is identical whether or not the account exists to avoid
+    account enumeration; a link is only sent to unverified accounts.
+    """
+    settings: Settings = get_settings()
+    enforce("verify_email_resend", client_ip(request), settings.verify_ip_per_hour, 3600)
+    user = db.query(User).filter(User.email == payload.email.lower()).first()
+    if user is None or user.email_verified:
+        return {"ok": True, "dev_verify_url": None}
+    db.query(EmailVerificationToken).filter(
+        EmailVerificationToken.user_id == user.id
+    ).delete()
+    db.commit()
+    token = new_token()
+    db.add(
+        EmailVerificationToken(
+            user_id=user.id,
+            token_digest=token_digest(token),
+            expires_at=_utcnow_plus(settings.token_ttl_hours),
+        )
+    )
+    db.commit()
+    dev_url = send_verification_link(settings, user.email, token, _accept_locale(request))
     return {"ok": True, "dev_verify_url": dev_url}
 
 

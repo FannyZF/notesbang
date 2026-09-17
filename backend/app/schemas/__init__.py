@@ -35,6 +35,10 @@ class ForgotIn(BaseModel):
     email: EmailStr
 
 
+class ResendVerificationIn(BaseModel):
+    email: EmailStr
+
+
 class ResetIn(BaseModel):
     token: str = Field(min_length=8)
     new: str = Field(min_length=8, max_length=128)
