@@ -22,15 +22,6 @@ services:
     volumes:
       - redisdata:/data
 
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-notesbang}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-notesbang_dev_secret}
-    volumes:
-      - miniodata:/data
-
   api:
     build: ./backend
     environment:
@@ -39,14 +30,11 @@ services:
       REDIS_URL: redis://redis:6379/0
       TASK_BACKEND: celery
       EXEC_ASYNC: "true"
-      STORAGE_BACKEND: s3
-      S3_ENDPOINT: http://minio:9000
-      S3_BUCKET: ${S3_BUCKET:-notesbang}
-      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-notesbang}
-      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-notesbang_dev_secret}
-      S3_SECURE: "false"
-      RENDER_SLIDES: "true"
-      VISION_ENABLED: "true"
+      # Object storage + slide rendering are unused by the content-scoring
+      # product, so everything stays on local disk (no MinIO needed).
+      STORAGE_BACKEND: local
+      RENDER_SLIDES: "false"
+      VISION_ENABLED: "false"
       MAIL_DRIVER: ${MAIL_DRIVER:-console}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -73,12 +61,8 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-notesbang}:${POSTGRES_PASSWORD:-notesbang_dev}@postgres:5432/${POSTGRES_DB:-notesbang}
       REDIS_URL: redis://redis:6379/0
       TASK_BACKEND: celery
-      STORAGE_BACKEND: s3
-      S3_ENDPOINT: http://minio:9000
-      S3_BUCKET: ${S3_BUCKET:-notesbang}
-      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-notesbang}
-      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-notesbang_dev_secret}
-      RENDER_SLIDES: "true"
+      STORAGE_BACKEND: local
+      RENDER_SLIDES: "false"
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       LLM_PROVIDER: ${LLM_PROVIDER:-mock}
     depends_on:
@@ -92,11 +76,7 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-notesbang}:${POSTGRES_PASSWORD:-notesbang_dev}@postgres:5432/${POSTGRES_DB:-notesbang}
       REDIS_URL: redis://redis:6379/0
       TASK_BACKEND: celery
-      STORAGE_BACKEND: s3
-      S3_ENDPOINT: http://minio:9000
-      S3_BUCKET: ${S3_BUCKET:-notesbang}
-      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-notesbang}
-      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-notesbang_dev_secret}
+      STORAGE_BACKEND: local
     depends_on:
       - redis
 
@@ -128,6 +108,5 @@ services:
 volumes:
   pgdata:
   redisdata:
-  miniodata:
   caddydata:
   caddyconfig:

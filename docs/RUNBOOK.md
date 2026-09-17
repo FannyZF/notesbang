@@ -1,9 +1,13 @@
 # NotesBang — Operations Runbook
 
 ## Stack
-`docker compose` runs: Postgres, Redis, MinIO, API (FastAPI), Celery worker,
+`docker compose` runs: Postgres, Redis, API (FastAPI), Celery worker,
 Celery beat, Next.js web, Caddy (HTTP/HTTPS reverse proxy). Set `PUBLIC_ORIGIN`,
 `HTTP_PORT`, `SITE_ADDRESS` and secrets in `.env` (see `.env.example`).
+
+Object storage (MinIO/S3) and slide rendering are **not** part of the
+content-scoring product, so the stack runs with `STORAGE_BACKEND=local` and no
+MinIO service.
 
 ### Public port (default 8088)
 Caddy publishes **`HTTP_PORT` (default 8088) → container :80**. With the default
@@ -34,12 +38,12 @@ process). Everything else is light.
 | Recommended launch | 4 | 8 GB (+2–4 GB swap) | 80 GB SSD | `worker --concurrency=2..3` |
 | Growth | 8 | 16 GB | 160 GB+ | separate worker host; managed Postgres/Redis/S3 |
 
-Per-service RAM (rough): Postgres 200–500 MB, Redis ~50 MB, MinIO 100–200 MB,
-API 200–400 MB, worker 400 MB + ~400 MB per render process, beat ~100 MB,
+Per-service RAM (rough): Postgres 200–500 MB, Redis ~50 MB,
+API 200–400 MB, worker 300–400 MB, beat ~100 MB,
 Next.js standalone 150–300 MB, Caddy ~30 MB.
 
-Storage: source ≤50 MB/deck + ~0.2–0.5 MB per slide image; ~1000 decks/month ≈
-10–30 GB with `RETENTION_DAYS=30`. Offload to S3 (`STORAGE_BACKEND=s3`) to scale.
+Storage: documents and analyses live in Postgres; uploads are stored on the
+API/worker disk (`STORAGE_DIR`). Back up Postgres; nothing else needs mirroring.
 
 Rules of thumb:
 - Set Celery concurrency from RAM (2 on 4 GB, 3–4 on 8 GB); LibreOffice spikes.
@@ -65,13 +69,12 @@ docker compose exec api alembic downgrade -1
 ```
 
 ## Backups & restore
-- **Postgres**: `docker compose exec postgres pg_dump -U notesbang notesbang > backup.sql`
+- **Postgres** (the only stateful store): `docker compose exec postgres pg_dump -U notesbang notesbang > backup.sql`
   Restore: `cat backup.sql | docker compose exec -T postgres psql -U notesbang notesbang`
-- **MinIO**: mirror the bucket (mc / rclone) to off-host storage on a schedule.
 
 ## Retention / housekeeping
-Celery beat runs `jobs.retention_cleanup` daily (purges slide images for
-projects older than `RETENTION_DAYS`). Trigger manually:
+Celery beat runs `jobs.retention_cleanup` daily (purges local upload artifacts
+and stale data older than `RETENTION_DAYS`). Trigger manually:
 ```bash
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$PUBLIC_ORIGIN/api/admin/maintenance/cleanup?ttl_days=30"
@@ -83,9 +86,9 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
 - Optional Sentry via `SENTRY_DSN`.
 
 ## Scaling
-- Increase `celery worker` replicas for generation throughput.
+- Increase `celery worker` replicas for analysis throughput.
 - Rate limiting uses Redis (multi-instance safe).
-- Object storage is MinIO/S3, so web/API are stateless (except local disk logs).
+- Web/API are stateless; Postgres and Redis hold all shared state.
 
 ## Incident basics
 1. Check `docker compose ps` and `logs`.
