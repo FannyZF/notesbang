@@ -1,4 +1,4 @@
-"""Admin operations: points adjustment, plan override, ban/unban."""
+"""Admin operations: settings overrides, usage stats, plan override, ban/unban."""
 from __future__ import annotations
 
 import os
@@ -16,14 +16,6 @@ def test_admin_adjust_plan_ban(client):
         token, email = register_verified(client)
         users = client.get("/api/admin/users", headers=_admin_headers()).json()
         uid = next(u["id"] for u in users if u["email"] == email)
-
-        pts = client.post(
-            f"/api/admin/users/{uid}/points",
-            headers=_admin_headers(),
-            json={"delta": 50, "note": "goodwill"},
-        )
-        assert pts.status_code == 200, pts.text
-        assert pts.json()["balance"] == 50
 
         plan = client.post(
             f"/api/admin/users/{uid}/plan",
@@ -71,3 +63,73 @@ def test_notification_preferences(client):
     assert r.json()["notify_on_complete"] is False
     me = client.get("/api/auth/me", headers=_auth(token)).json()
     assert me["notify_on_complete"] is False
+
+
+def _make_analysis(client, token):
+    doc = client.post(
+        "/api/documents",
+        headers=_auth(token),
+        json={"content": "这是一段用于测试的文案内容。" * 8, "platform": "xiaohongshu"},
+    ).json()
+    r = client.post(f"/api/documents/{doc['id']}/analyze", headers=_auth(token))
+    assert r.status_code == 200, r.text
+    return doc
+
+
+def test_admin_settings_override_free_limit(client):
+    os.environ["ADMIN_TOKEN"] = "test-admin-token"
+    try:
+        token, email = register_verified(client)
+        before = client.get("/api/documents/quota", headers=_auth(token)).json()
+        assert before["limit"] == 3
+
+        r = client.put(
+            "/api/admin/settings",
+            headers=_admin_headers(),
+            json={"free_daily_limit": 1, "usd_to_cny": 7.0, "llm_api_key": "sk-test-1234"},
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["free_daily_limit"] == 1
+        assert body["usd_to_cny"] == 7.0
+        assert body["llm_api_key_set"] is True
+        assert "sk-test-1234" not in body["llm_api_key_masked"]
+
+        after = client.get("/api/documents/quota", headers=_auth(token)).json()
+        assert after["limit"] == 1
+
+        _make_analysis(client, token)
+        doc = client.post(
+            "/api/documents",
+            headers=_auth(token),
+            json={"content": "再来一篇测试文案。" * 10, "platform": "xiaohongshu"},
+        ).json()
+        blocked = client.post(
+            f"/api/documents/{doc['id']}/analyze", headers=_auth(token)
+        )
+        assert blocked.status_code == 429
+        assert blocked.headers.get("X-Error-Code") == "DAILY_LIMIT_REACHED"
+
+        summary = client.get("/api/admin/summary", headers=_admin_headers()).json()
+        assert summary["totals"]["free_daily_limit"] == 1
+        assert summary["totals"]["analyses_today"] == 1
+        assert summary["totals"]["estimated_llm_cost_cny"] >= 0
+        assert "topups_points" not in summary["totals"]
+    finally:
+        os.environ.pop("ADMIN_TOKEN", None)
+
+
+def test_admin_users_report_usage(client):
+    os.environ["ADMIN_TOKEN"] = "test-admin-token"
+    try:
+        token, email = register_verified(client)
+        _make_analysis(client, token)
+        rows = client.get("/api/admin/users", headers=_admin_headers()).json()
+        row = next(u for u in rows if u["email"] == email)
+        assert row["analyses"] == 1
+        assert row["documents"] == 1
+        assert row["analyses_today"] == 1
+        assert row["last_analysis_at"]
+        assert "balance" not in row
+    finally:
+        os.environ.pop("ADMIN_TOKEN", None)

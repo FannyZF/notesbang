@@ -121,6 +121,8 @@ class Settings:
         # Indicative per-million-token prices for cost estimation only.
         self.cost_input_per_m = float(os.getenv("COST_INPUT_PER_M", "0.27"))
         self.cost_output_per_m = float(os.getenv("COST_OUTPUT_PER_M", "1.10"))
+        # Display rate for converting estimated LLM cost (USD) to CNY.
+        self.usd_to_cny = float(os.getenv("USD_TO_CNY", "7.2"))
 
         # Length/speech defaults (PRD §4.4 placeholders).
         self.default_speed_cps_cn = float(os.getenv("DEFAULT_SPEED_CPS_CN", "3.3"))

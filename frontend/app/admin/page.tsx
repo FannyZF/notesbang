@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000/api";
 
@@ -10,18 +10,47 @@ type Totals = {
   trial_used: number;
   documents: number;
   analyses: number;
-  topups_points: number;
-  charges_points: number;
+  analyses_today: number;
+  active_users_7d: number;
+  tokens_input: number;
+  tokens_output: number;
   estimated_llm_cost_usd: number;
+  estimated_llm_cost_cny: number;
+  usd_to_cny: number;
+  free_daily_limit: number;
 };
 type UserRow = {
   id: number;
   email: string;
   plan: string;
   verified: boolean;
-  balance: number;
   trial_used: boolean;
+  documents: number;
+  analyses: number;
+  analyses_today: number;
+  last_analysis_at: string | null;
   created_at: string | null;
+};
+type Settings = {
+  llm_provider: string;
+  llm_model: string;
+  llm_base_url: string;
+  llm_api_key_set: boolean;
+  llm_api_key_masked: string;
+  free_daily_limit: number;
+  usd_to_cny: number;
+  cost_input_per_m: number;
+  cost_output_per_m: number;
+};
+type SettingsForm = {
+  llm_provider: string;
+  llm_api_key: string;
+  llm_model: string;
+  llm_base_url: string;
+  free_daily_limit: string;
+  usd_to_cny: string;
+  cost_input_per_m: string;
+  cost_output_per_m: string;
 };
 
 export default function AdminPage() {
@@ -32,31 +61,49 @@ export default function AdminPage() {
   const [input, setInput] = useState("");
   const [totals, setTotals] = useState<Totals | null>(null);
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [form, setForm] = useState<SettingsForm | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const headers = token ? ({ Authorization: `Bearer ${token}` } as Record<string, string>) : undefined;
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!token) return;
     setBusy(true);
     setError(null);
     try {
-      const [s, u] = await Promise.all([
+      const [s, u, cfg] = await Promise.all([
         fetch(`${API_BASE}/admin/summary`, { headers }),
         fetch(`${API_BASE}/admin/users?limit=100`, { headers }),
+        fetch(`${API_BASE}/admin/settings`, { headers }),
       ]);
       if (!s.ok) throw new Error(`Summary ${s.status}: ${(await s.text()).slice(0, 160)}`);
       if (!u.ok) throw new Error(`Users ${u.status}: ${(await u.text()).slice(0, 160)}`);
+      if (!cfg.ok) throw new Error(`Settings ${cfg.status}: ${(await cfg.text()).slice(0, 160)}`);
       const sData = (await s.json()) as { totals: Totals; recent_users: UserRow[] };
       setTotals(sData.totals);
-      setUsers(sData.recent_users.length ? sData.recent_users : ((await u.json()) as UserRow[]));
+      setUsers((await u.json()) as UserRow[]);
+      const cfgData = (await cfg.json()) as Settings;
+      setSettings(cfgData);
+      setForm({
+        llm_provider: cfgData.llm_provider,
+        llm_api_key: "",
+        llm_model: cfgData.llm_model,
+        llm_base_url: cfgData.llm_base_url,
+        free_daily_limit: String(cfgData.free_daily_limit),
+        usd_to_cny: String(cfgData.usd_to_cny),
+        cost_input_per_m: String(cfgData.cost_input_per_m),
+        cost_output_per_m: String(cfgData.cost_output_per_m),
+      });
     } catch (err) {
       setError(errMessage(err));
     } finally {
       setBusy(false);
     }
-  };
+  }, [token, headers]);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -64,13 +111,61 @@ export default function AdminPage() {
     setToken(t || null);
     if (t) window.sessionStorage.setItem("nb_admin_token", t);
     else window.sessionStorage.removeItem("nb_admin_token");
-    if (t) void load();
+  };
+
+  const saveSettings = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!form) return;
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const payload: Record<string, string | number> = {
+        llm_provider: form.llm_provider,
+        llm_model: form.llm_model,
+        llm_base_url: form.llm_base_url,
+        free_daily_limit: Number(form.free_daily_limit),
+        usd_to_cny: Number(form.usd_to_cny),
+        cost_input_per_m: Number(form.cost_input_per_m),
+        cost_output_per_m: Number(form.cost_output_per_m),
+      };
+      if (form.llm_api_key.trim()) payload.llm_api_key = form.llm_api_key.trim();
+      const r = await fetch(`${API_BASE}/admin/settings`, {
+        method: "PUT",
+        headers: { ...(headers ?? {}), "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) throw new Error(`Save ${r.status}: ${(await r.text()).slice(0, 200)}`);
+      setNotice("Settings saved.");
+      await load();
+    } catch (err) {
+      setError(errMessage(err));
+    } finally {
+      setSaving(false);
+    }
   };
 
   useEffect(() => {
     if (token) void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, load]);
+
+  const field = (
+    key: keyof SettingsForm,
+    label: string,
+    opts: { type?: string; placeholder?: string; step?: string } = {}
+  ) => (
+    <label className="flex flex-col gap-1 text-xs text-zinc-500">
+      {label}
+      <input
+        className="rounded-xl border border-zinc-200 px-3 py-2 text-sm text-zinc-800"
+        type={opts.type ?? "text"}
+        step={opts.step}
+        placeholder={opts.placeholder}
+        value={form ? form[key] : ""}
+        onChange={(e) => setForm((f) => (f ? { ...f, [key]: e.target.value } : f))}
+      />
+    </label>
+  );
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-6 px-6 py-10 font-sans text-zinc-900">
@@ -96,6 +191,7 @@ export default function AdminPage() {
       </form>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</div>}
 
       {token && !error && (
         <button onClick={() => void load()} className="self-start rounded-full border border-zinc-200 px-4 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50">
@@ -108,12 +204,23 @@ export default function AdminPage() {
           {[
             { label: "Users", value: totals.users },
             { label: "Verified", value: totals.verified_users },
-            { label: "Trial used", value: totals.trial_used },
             { label: "Documents", value: totals.documents },
             { label: "Analyses", value: totals.analyses },
-            { label: "Top-ups (pts)", value: totals.topups_points },
-            { label: "Charged (pts)", value: totals.charges_points },
-            { label: "Est. LLM cost ($)", value: totals.estimated_llm_cost_usd.toFixed(4) },
+            { label: "Analyses today", value: totals.analyses_today },
+            { label: "Active users (7d)", value: totals.active_users_7d },
+            { label: "Free limit / day", value: totals.free_daily_limit },
+            {
+              label: `Est. LLM cost (¥ @${totals.usd_to_cny})`,
+              value: `¥${totals.estimated_llm_cost_cny.toFixed(4)}`,
+            },
+            {
+              label: "Tokens (in / out)",
+              value: `${totals.tokens_input.toLocaleString()} / ${totals.tokens_output.toLocaleString()}`,
+            },
+            {
+              label: "Est. LLM cost ($)",
+              value: `$${totals.estimated_llm_cost_usd.toFixed(4)}`,
+            },
           ].map((s) => (
             <div key={s.label} className="rounded-2xl border border-zinc-200/80 p-4">
               <p className="text-xs text-zinc-400">{s.label}</p>
@@ -123,33 +230,87 @@ export default function AdminPage() {
         </section>
       )}
 
+      {form && settings && (
+        <section className="rounded-2xl border border-zinc-200/80 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-medium text-zinc-700">Runtime settings</h2>
+            <span className="text-xs text-zinc-400">
+              {settings.llm_api_key_set
+                ? `API key: ${settings.llm_api_key_masked}`
+                : "API key: not set (mock provider)"}
+            </span>
+          </div>
+          <form onSubmit={saveSettings} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <label className="flex flex-col gap-1 text-xs text-zinc-500">
+              LLM provider
+              <select
+                className="rounded-xl border border-zinc-200 px-3 py-2 text-sm text-zinc-800"
+                value={form.llm_provider}
+                onChange={(e) => setForm({ ...form, llm_provider: e.target.value })}
+              >
+                <option value="mock">mock (offline)</option>
+                <option value="deepseek">deepseek</option>
+              </select>
+            </label>
+            {field("llm_api_key", "API key (leave blank to keep)", {
+              type: "password",
+              placeholder: settings.llm_api_key_set ? "•••••••• (unchanged)" : "sk-...",
+            })}
+            {field("llm_model", "Model")}
+            {field("llm_base_url", "Base URL")}
+            {field("free_daily_limit", "Free analyses / day", { type: "number" })}
+            {field("usd_to_cny", "USD → CNY rate", { type: "number", step: "0.01" })}
+            {field("cost_input_per_m", "Cost $/M input tokens", { type: "number", step: "0.0001" })}
+            {field("cost_output_per_m", "Cost $/M output tokens", { type: "number", step: "0.0001" })}
+            <div className="flex items-end">
+              <button
+                className="rounded-full bg-zinc-900 px-5 py-2 text-sm font-medium text-white disabled:opacity-50"
+                disabled={saving}
+              >
+                {saving ? "Saving…" : "Save settings"}
+              </button>
+            </div>
+          </form>
+        </section>
+      )}
+
       {users.length > 0 && (
         <section className="overflow-hidden rounded-2xl border border-zinc-200/80">
-          <div className="border-b border-zinc-100 px-5 py-3 text-sm font-medium text-zinc-600">Recent users</div>
-          <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-50 text-xs text-zinc-400">
-              <tr>
-                <th className="px-5 py-2 font-medium">Email</th>
-                <th className="px-5 py-2 font-medium">Plan</th>
-                <th className="px-5 py-2 font-medium">Verified</th>
-                <th className="px-5 py-2 font-medium">Trial used</th>
-                <th className="px-5 py-2 font-medium">Balance</th>
-                <th className="px-5 py-2 font-medium">Joined</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {users.map((u) => (
-                <tr key={u.id}>
-                  <td className="px-5 py-2 text-zinc-700">{u.email}</td>
-                  <td className="px-5 py-2 text-zinc-500">{u.plan}</td>
-                  <td className="px-5 py-2 text-zinc-500">{u.verified ? "✓" : "—"}</td>
-                  <td className="px-5 py-2 text-zinc-500">{u.trial_used ? "✓" : "—"}</td>
-                  <td className="px-5 py-2 text-zinc-700">{u.balance}</td>
-                  <td className="px-5 py-2 text-zinc-400">{u.created_at ? new Date(u.created_at).toLocaleDateString() : ""}</td>
+          <div className="border-b border-zinc-100 px-5 py-3 text-sm font-medium text-zinc-600">Users &amp; usage</div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-zinc-50 text-xs text-zinc-400">
+                <tr>
+                  <th className="px-5 py-2 font-medium">Email</th>
+                  <th className="px-5 py-2 font-medium">Plan</th>
+                  <th className="px-5 py-2 font-medium">Verified</th>
+                  <th className="px-5 py-2 font-medium">Analyses</th>
+                  <th className="px-5 py-2 font-medium">Docs</th>
+                  <th className="px-5 py-2 font-medium">Today</th>
+                  <th className="px-5 py-2 font-medium">Last analysis</th>
+                  <th className="px-5 py-2 font-medium">Joined</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {users.map((u) => (
+                  <tr key={u.id}>
+                    <td className="px-5 py-2 text-zinc-700">{u.email}</td>
+                    <td className="px-5 py-2 text-zinc-500">{u.plan}</td>
+                    <td className="px-5 py-2 text-zinc-500">{u.verified ? "✓" : "—"}</td>
+                    <td className="px-5 py-2 text-zinc-700">{u.analyses}</td>
+                    <td className="px-5 py-2 text-zinc-500">{u.documents}</td>
+                    <td className="px-5 py-2 text-zinc-500">{u.analyses_today}</td>
+                    <td className="px-5 py-2 text-zinc-400">
+                      {u.last_analysis_at ? new Date(u.last_analysis_at).toLocaleString() : "—"}
+                    </td>
+                    <td className="px-5 py-2 text-zinc-400">
+                      {u.created_at ? new Date(u.created_at).toLocaleDateString() : ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
     </main>

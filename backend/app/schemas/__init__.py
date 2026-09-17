@@ -45,9 +45,15 @@ class PreferencesIn(BaseModel):
     locale: str | None = Field(default=None, pattern="^(en|zh)$")
 
 
-class AdminPointsIn(BaseModel):
-    delta: int
-    note: str | None = None
+class AdminSettingsIn(BaseModel):
+    llm_provider: str | None = Field(default=None, pattern="^(mock|deepseek)$")
+    llm_api_key: str | None = Field(default=None, max_length=256)
+    llm_model: str | None = Field(default=None, max_length=128)
+    llm_base_url: str | None = Field(default=None, max_length=256)
+    free_daily_limit: int | None = Field(default=None, ge=0, le=1000)
+    usd_to_cny: float | None = Field(default=None, ge=0)
+    cost_input_per_m: float | None = Field(default=None, ge=0)
+    cost_output_per_m: float | None = Field(default=None, ge=0)
 
 
 class AdminPlanIn(BaseModel):

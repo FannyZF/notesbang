@@ -15,6 +15,7 @@ from app.content import rewrite as rewrite_mod
 from app.content.features import content_length, detect_language, extract_facts
 from app.content.rubric import get_platform, load_rubric, platform_label
 from app.core.config import get_settings
+from app.core import runtime
 from app.db.base import get_db
 from app.llm.gateway import get_provider
 from app.models import (
@@ -193,7 +194,6 @@ def get_quota(
     db: Session = Depends(get_db),
 ):
     """Current free daily quota (for proactive UI hints)."""
-    settings = get_settings()
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     usage = (
         db.query(DailyUsage)
@@ -201,7 +201,7 @@ def get_quota(
         .first()
     )
     used = usage.count if usage else 0
-    limit = settings.free_daily_limit
+    limit = runtime.free_daily_limit(db)
     return {
         "day": day,
         "limit": limit,
@@ -265,7 +265,6 @@ def delete_document(
 
 
 def _quota_check(db: Session, user: User) -> None:
-    settings = get_settings()
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     usage = (
         db.query(DailyUsage)
@@ -273,10 +272,11 @@ def _quota_check(db: Session, user: User) -> None:
         .first()
     )
     used = usage.count if usage else 0
-    if used >= settings.free_daily_limit:
+    limit = runtime.free_daily_limit(db)
+    if used >= limit:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Daily free limit reached ({settings.free_daily_limit})",
+            detail=f"Daily free limit reached ({limit})",
             headers={"X-Error-Code": "DAILY_LIMIT_REACHED"},
         )
     if usage is None:

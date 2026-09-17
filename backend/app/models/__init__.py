@@ -304,3 +304,19 @@ class DailyUsage(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     day: Mapped[str] = mapped_column(String(10), index=True)  # YYYY-MM-DD (UTC)
     count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class AppSetting(Base):
+    """Runtime-adjustable settings edited from the admin console.
+
+    Env vars stay the fallback defaults; rows here override them without a
+    redeploy (LLM API key, daily free limit, cost rates, ...).
+    """
+
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )

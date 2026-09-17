@@ -1,26 +1,30 @@
 """Lightweight admin console API (gated by ADMIN_TOKEN).
 
-Provides operational aggregates and a basic user directory — never exposes
-notes content, wallet internals, or secrets. Deeper admin (refunds, plans)
-can build on this later.
+Provides operational aggregates, a basic user directory with per-user usage
+counts, and runtime settings (LLM key/model, daily free limit, cost rates).
+Never exposes notes content or secrets in clear text.
 """
 from __future__ import annotations
 
 import os
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core import runtime
+from app.core.config import get_settings
 from app.db.base import get_db
 from app.models import (
     Analysis,
+    AppSetting,
+    DailyUsage,
     Document,
     Entitlement,
-    LedgerEntry,
     User,
 )
-from app.schemas import AdminBanIn, AdminPlanIn, AdminPointsIn
+from app.schemas import AdminBanIn, AdminPlanIn, AdminSettingsIn
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -43,6 +47,42 @@ def _require_admin(request: Request) -> None:
         )
 
 
+def _today() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def _usage_maps(db: Session, user_ids: list[int]) -> dict[str, dict[int, object]]:
+    """Per-user counts: documents, analyses, today's usage, last analysis."""
+    if not user_ids:
+        return {"documents": {}, "analyses": {}, "today": {}, "last": {}}
+    documents = dict(
+        db.query(Document.user_id, func.count(Document.id))
+        .filter(Document.user_id.in_(user_ids))
+        .group_by(Document.user_id)
+        .all()
+    )
+    analyses = dict(
+        db.query(Document.user_id, func.count(Analysis.id))
+        .join(Analysis, Analysis.document_id == Document.id)
+        .filter(Document.user_id.in_(user_ids))
+        .group_by(Document.user_id)
+        .all()
+    )
+    today = dict(
+        db.query(DailyUsage.user_id, DailyUsage.count)
+        .filter(DailyUsage.user_id.in_(user_ids), DailyUsage.day == _today())
+        .all()
+    )
+    last = dict(
+        db.query(Document.user_id, func.max(Analysis.created_at))
+        .join(Analysis, Analysis.document_id == Document.id)
+        .filter(Document.user_id.in_(user_ids))
+        .group_by(Document.user_id)
+        .all()
+    )
+    return {"documents": documents, "analyses": analyses, "today": today, "last": last}
+
+
 @router.get("/summary")
 def admin_summary(
     request: Request,
@@ -56,17 +96,26 @@ def admin_summary(
     )
     documents = db.query(func.count(Document.id)).scalar() or 0
     analyses = db.query(func.count(Analysis.id)).scalar() or 0
-    topups = db.query(LedgerEntry).filter(LedgerEntry.kind == "topup").all()
-    charges = db.query(LedgerEntry).filter(LedgerEntry.kind == "charge").all()
-    llm_cost = (
+    analyses_today = (
+        db.query(func.coalesce(func.sum(DailyUsage.count), 0))
+        .filter(DailyUsage.day == _today())
+        .scalar()
+        or 0
+    )
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    active_users_7d = (
+        db.query(func.count(func.distinct(DailyUsage.user_id)))
+        .filter(DailyUsage.day >= week_ago)
+        .scalar()
+        or 0
+    )
+    llm_cost_usd = float(
         db.query(func.coalesce(func.sum(Analysis.cost_est), 0.0)).scalar() or 0.0
     )
-    recent = (
-        db.query(User)
-        .order_by(User.created_at.desc())
-        .limit(10)
-        .all()
-    )
+    tokens_in = int(db.query(func.coalesce(func.sum(Analysis.input_tokens), 0)).scalar() or 0)
+    tokens_out = int(db.query(func.coalesce(func.sum(Analysis.output_tokens), 0)).scalar() or 0)
+    rate = runtime.usd_to_cny(db)
+    recent = db.query(User).order_by(User.created_at.desc()).limit(10).all()
     return {
         "totals": {
             "users": total_users,
@@ -74,9 +123,14 @@ def admin_summary(
             "trial_used": trial_used,
             "documents": documents,
             "analyses": analyses,
-            "topups_points": sum(e.amount for e in topups if e.amount > 0),
-            "charges_points": abs(sum(e.amount for e in charges if e.amount < 0)),
-            "estimated_llm_cost_usd": round(float(llm_cost), 6),
+            "analyses_today": int(analyses_today),
+            "active_users_7d": active_users_7d,
+            "tokens_input": tokens_in,
+            "tokens_output": tokens_out,
+            "estimated_llm_cost_usd": round(llm_cost_usd, 6),
+            "estimated_llm_cost_cny": round(llm_cost_usd * rate, 4),
+            "usd_to_cny": rate,
+            "free_daily_limit": runtime.free_daily_limit(db),
         },
         "recent_users": [
             {
@@ -91,44 +145,76 @@ def admin_summary(
     }
 
 
-@router.post("/users/{user_id}/points")
-def admin_adjust_points(
-    user_id: int,
-    payload: AdminPointsIn,
+@router.get("/settings")
+def admin_get_settings(request: Request, db: Session = Depends(get_db)):
+    _require_admin(request)
+    settings = get_settings()
+    cfg = runtime.llm_config(db)
+    overrides = {
+        row.key: ("***" if row.key in runtime.SECRET_KEYS else row.value)
+        for row in db.query(AppSetting).all()
+        if row.key in runtime.EDITABLE_KEYS
+    }
+    return {
+        "llm_provider": cfg["provider"],
+        "llm_model": cfg["model"],
+        "llm_base_url": cfg["base_url"],
+        "llm_api_key_set": bool(cfg["api_key"]),
+        "llm_api_key_masked": runtime.mask_secret(cfg["api_key"]),
+        "free_daily_limit": runtime.free_daily_limit(db),
+        "usd_to_cny": runtime.usd_to_cny(db),
+        "cost_input_per_m": cfg["cost_input_per_m"],
+        "cost_output_per_m": cfg["cost_output_per_m"],
+        "overrides": overrides,
+        "env": {
+            "llm_provider": settings.llm_provider,
+            "llm_model": settings.deepseek_model,
+            "llm_base_url": settings.deepseek_base_url,
+            "llm_api_key_set": bool(settings.deepseek_api_key),
+            "free_daily_limit": settings.free_daily_limit,
+            "usd_to_cny": settings.usd_to_cny,
+            "cost_input_per_m": settings.cost_input_per_m,
+            "cost_output_per_m": settings.cost_output_per_m,
+        },
+    }
+
+
+@router.put("/settings")
+def admin_update_settings(
+    payload: AdminSettingsIn,
     request: Request,
     db: Session = Depends(get_db),
 ):
     _require_admin(request)
-    import secrets
-
-    from sqlalchemy import update
-
-    from app.models import LedgerEntry, Wallet
-
-    user = db.get(User, user_id)
-    if user is None or user.wallet is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
-    new_balance = user.wallet.balance + payload.delta
-    if new_balance < 0:
+    data = payload.model_dump(exclude_unset=True)
+    if not data:
         raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Balance cannot go negative"
+            status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No settings provided"
         )
-    db.execute(
-        update(Wallet)
-        .where(Wallet.id == user.wallet.id)
-        .values(balance=new_balance, version=Wallet.version + 1)
-    )
-    db.add(
-        LedgerEntry(
-            user_id=user.id,
-            kind="refund" if payload.delta > 0 else "charge",
-            amount=payload.delta,
-            provider_event_id=f"admin_{secrets.token_urlsafe(8)}",
-            note=payload.note or "admin adjustment",
-        )
-    )
+    for key, value in data.items():
+        if key not in runtime.EDITABLE_KEYS:
+            continue
+        if value is None:
+            continue
+        if key == "llm_api_key":
+            runtime.set_setting(db, key, str(value).strip())
+            continue
+        if key == "free_daily_limit":
+            limit = int(value)
+            if limit < 0 or limit > 1000:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="free_daily_limit must be between 0 and 1000",
+                )
+        if key in ("usd_to_cny", "cost_input_per_m", "cost_output_per_m"):
+            if float(value) < 0:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"{key} must be >= 0",
+                )
+        runtime.set_setting(db, key, str(value).strip())
     db.commit()
-    return {"ok": True, "balance": new_balance}
+    return admin_get_settings(request, db)
 
 
 @router.post("/users/{user_id}/plan")
@@ -293,14 +379,22 @@ def admin_users(
     if email:
         q = q.filter(User.email.ilike(f"%{email}%"))
     rows = q.order_by(User.created_at.desc()).limit(limit).all()
+    maps = _usage_maps(db, [u.id for u in rows])
     return [
         {
             "id": u.id,
             "email": u.email,
             "plan": u.plan_state,
             "verified": u.email_verified,
-            "balance": u.wallet.balance if u.wallet else 0,
             "trial_used": bool(u.entitlement and u.entitlement.trial_used),
+            "documents": int(maps["documents"].get(u.id, 0)),
+            "analyses": int(maps["analyses"].get(u.id, 0)),
+            "analyses_today": int(maps["today"].get(u.id, 0)),
+            "last_analysis_at": (
+                maps["last"][u.id].isoformat()
+                if maps["last"].get(u.id) is not None
+                else None
+            ),
             "created_at": u.created_at.isoformat() if u.created_at else None,
         }
         for u in rows

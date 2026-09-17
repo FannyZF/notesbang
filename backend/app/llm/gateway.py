@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import httpx
+from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 
@@ -32,6 +33,22 @@ class LLMResult:
 
 class Provider:
     model: str = ""
+    cost_input_per_m: float | None = None
+    cost_output_per_m: float | None = None
+
+    def _rates(self) -> tuple[float, float]:
+        settings: Settings = get_settings()
+        cin = (
+            self.cost_input_per_m
+            if self.cost_input_per_m is not None
+            else settings.cost_input_per_m
+        )
+        cout = (
+            self.cost_output_per_m
+            if self.cost_output_per_m is not None
+            else settings.cost_output_per_m
+        )
+        return cin, cout
 
     def chat(
         self,
@@ -45,15 +62,12 @@ class Provider:
         raise NotImplementedError
 
     def estimate(self, system: str, user: str, out_text: str) -> LLMResult:
-        settings: Settings = get_settings()
         # Rough token estimate; refine after the DeepSeek spike (PRD §15).
         approx = lambda t: max(1, round(len(t) / 1.6))  # noqa: E731
         inp = approx(system) + approx(user)
         out = approx(out_text)
-        cost = (
-            inp / 1_000_000 * settings.cost_input_per_m
-            + out / 1_000_000 * settings.cost_output_per_m
-        )
+        cin, cout = self._rates()
+        cost = inp / 1_000_000 * cin + out / 1_000_000 * cout
         return LLMResult(
             text=out_text,
             model=self.model,
@@ -87,12 +101,23 @@ class MockProvider(Provider):
 
 
 class DeepSeekProvider(Provider):
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        model: str | None = None,
+        cost_input_per_m: float | None = None,
+        cost_output_per_m: float | None = None,
+    ) -> None:
         self.settings = settings
-        self.api_key = settings.deepseek_api_key
-        self.base = settings.deepseek_base_url.rstrip("/")
-        self.model = settings.deepseek_model
+        self.api_key = api_key if api_key is not None else settings.deepseek_api_key
+        self.base = (base_url or settings.deepseek_base_url).rstrip("/")
+        self.model = model or settings.deepseek_model
         self.vision_model = settings.deepseek_vision_model
+        self.cost_input_per_m = cost_input_per_m
+        self.cost_output_per_m = cost_output_per_m
 
     def chat(
         self,
@@ -146,16 +171,41 @@ class DeepSeekProvider(Provider):
         result = self.estimate(system, user, content)
         result.input_tokens = int(usage.get("prompt_tokens", result.input_tokens))
         result.output_tokens = int(usage.get("completion_tokens", result.output_tokens))
+        cin, cout = self._rates()
         result.cost_est = round(
-            result.input_tokens / 1e6 * self.settings.cost_input_per_m
-            + result.output_tokens / 1e6 * self.settings.cost_output_per_m,
+            result.input_tokens / 1e6 * cin + result.output_tokens / 1e6 * cout,
             6,
         )
         return result
 
 
-def get_provider() -> Provider:
+def get_provider(db: Session | None = None) -> Provider:
+    """Effective provider honouring admin overrides (runtime settings).
+
+    ``db`` is optional so callers that already hold a session reuse it; when
+    omitted a short-lived session is opened to read the overrides.
+    """
+    from app.core import runtime
+    from app.db.base import SessionLocal
+
     settings = get_settings()
-    if settings.llm_provider == "deepseek":
-        return DeepSeekProvider(settings)
-    return MockProvider()
+    owned = db is None
+    session = db or SessionLocal()
+    try:
+        cfg = runtime.llm_config(session)
+    finally:
+        if owned:
+            session.close()
+    if cfg["provider"] == "deepseek" and cfg["api_key"]:
+        return DeepSeekProvider(
+            settings,
+            api_key=cfg["api_key"],
+            base_url=cfg["base_url"],
+            model=cfg["model"],
+            cost_input_per_m=cfg["cost_input_per_m"],
+            cost_output_per_m=cfg["cost_output_per_m"],
+        )
+    mock = MockProvider()
+    mock.cost_input_per_m = cfg["cost_input_per_m"]
+    mock.cost_output_per_m = cfg["cost_output_per_m"]
+    return mock
