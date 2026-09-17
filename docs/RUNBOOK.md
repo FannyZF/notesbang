@@ -2,8 +2,25 @@
 
 ## Stack
 `docker compose` runs: Postgres, Redis, MinIO, API (FastAPI), Celery worker,
-Celery beat, Next.js web, Caddy (auto-HTTPS). Set `DOMAIN` and secrets in `.env`
-(see `.env.example`).
+Celery beat, Next.js web, Caddy (HTTP/HTTPS reverse proxy). Set `PUBLIC_ORIGIN`,
+`HTTP_PORT`, `SITE_ADDRESS` and secrets in `.env` (see `.env.example`).
+
+### Public port (default 8088)
+Caddy publishes **`HTTP_PORT` (default 8088) → container :80**. With the default
+`SITE_ADDRESS=:80` it serves plain HTTP for any host, so the app is reachable at
+`http://<server-ip>:8088`. For a real domain with automatic HTTPS set:
+
+```env
+PUBLIC_ORIGIN=https://notesbang.example.com
+SITE_ADDRESS=notesbang.example.com
+HTTP_PORT=80
+HTTPS_PORT=443
+```
+
+`PUBLIC_ORIGIN` feeds `APP_BASE_URL` / `PUBLIC_WEB_URL` (email links) and the
+frontend's `NEXT_PUBLIC_API_BASE` (`<PUBLIC_ORIGIN>/api`) — it must be the URL
+users actually open, or verification links will be unreachable. Changing it
+requires rebuilding the web image (`docker compose up -d --build web`).
 
 ## Server sizing
 
@@ -29,12 +46,13 @@ Rules of thumb:
 - `RENDER_SLIDES=false` removes most CPU/RAM cost (no thumbnails/vision).
 - Web/API are stateless (rate limiting via Redis) → scale horizontally;
   scale workers separately, they dominate CPU.
-- OS: Ubuntu 22.04/24.04 LTS + Docker & Compose v2; expose only 80/443/SSH.
+- OS: Ubuntu 22.04/24.04 LTS + Docker & Compose v2; expose only `HTTP_PORT`
+  (default 8088), `HTTPS_PORT` (if using a domain) and SSH.
 - Prefer servers with good network proximity to the LLM provider.
 
 ## First deploy
 ```bash
-cp .env.example .env      # fill DOMAIN, DEEPSEEK_API_KEY, ADMIN_TOKEN, SMTP_*, passwords
+cp .env.example .env      # fill PUBLIC_ORIGIN, DEEPSEEK_API_KEY, ADMIN_TOKEN, SMTP_*, passwords
 docker compose up -d --build
 ```
 The API container runs `alembic upgrade head` on start (`RUN_MIGRATIONS=true`).
@@ -56,7 +74,7 @@ Celery beat runs `jobs.retention_cleanup` daily (purges slide images for
 projects older than `RETENTION_DAYS`). Trigger manually:
 ```bash
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
-  "https://$DOMAIN/api/admin/maintenance/cleanup?ttl_days=30"
+  "$PUBLIC_ORIGIN/api/admin/maintenance/cleanup?ttl_days=30"
 ```
 
 ## Observability

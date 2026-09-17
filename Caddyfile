@@ -1,4 +1,4 @@
-{$DOMAIN:localhost} {
+{$SITE_ADDRESS:localhost} {
 	encode gzip
 
 	handle /api/* {

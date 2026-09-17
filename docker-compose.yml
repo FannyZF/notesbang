@@ -1,5 +1,6 @@
 # Production-ish stack: Postgres + Redis + MinIO + API + Celery worker/beat
-# + Next.js web + Caddy (auto HTTPS). Set DOMAIN and secrets via .env.
+# + Next.js web + Caddy. Set PUBLIC_ORIGIN / HTTP_PORT / SITE_ADDRESS and
+# secrets via .env (default public port is 8088).
 services:
   postgres:
     image: postgres:16-alpine
@@ -55,8 +56,8 @@ services:
       ADMIN_TOKEN: ${ADMIN_TOKEN:-}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       LLM_PROVIDER: ${LLM_PROVIDER:-mock}
-      PUBLIC_WEB_URL: https://${DOMAIN:-localhost}
-      APP_BASE_URL: https://${DOMAIN:-localhost}
+      PUBLIC_WEB_URL: ${PUBLIC_ORIGIN:-http://localhost:8088}
+      APP_BASE_URL: ${PUBLIC_ORIGIN:-http://localhost:8088}
     depends_on:
       postgres:
         condition: service_healthy
@@ -103,17 +104,19 @@ services:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_BASE: https://${DOMAIN:-localhost}/api
+        NEXT_PUBLIC_API_BASE: ${PUBLIC_ORIGIN:-http://localhost:8088}/api
     depends_on:
       - api
 
   caddy:
     image: caddy:2-alpine
     ports:
-      - "80:80"
-      - "443:443"
+      - "${HTTP_PORT:-8088}:80"
+      - "${HTTPS_PORT:-443}:443"
     environment:
-      DOMAIN: ${DOMAIN:-localhost}
+      # ":80" serves plain HTTP for any host (IP:PORT access). For a real
+      # domain with automatic HTTPS set SITE_ADDRESS=yourdomain.com.
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddydata:/data
