@@ -17,7 +17,17 @@ from app.content.rubric import get_platform, load_rubric, platform_label
 from app.core.config import get_settings
 from app.db.base import get_db
 from app.llm.gateway import get_provider
-from app.models import Analysis, CorpusFeature, DailyUsage, DimensionScore, Document, Feedback, Rewrite, User
+from app.models import (
+    Analysis,
+    CorpusFeature,
+    DailyUsage,
+    DimensionScore,
+    Document,
+    ExpertScore,
+    Feedback,
+    Rewrite,
+    User,
+)
 from app.parsers.text_parser import ParseError, parse_upload
 from app.schemas import ConsentIn, DocumentPasteIn, FeedbackIn, RewriteIn
 
@@ -242,18 +252,64 @@ def _quota_check(db: Session, user: User) -> None:
     db.commit()
 
 
-def _analysis_out(db: Session, analysis: Analysis) -> dict:
+def _analysis_out(db: Session, analysis: Analysis, lang: str = "en") -> dict:
+    from app.content.rubric import expert_label
+
     dims = (
         db.query(DimensionScore)
         .filter(DimensionScore.analysis_id == analysis.id)
         .all()
     )
+    expert_rows = (
+        db.query(ExpertScore)
+        .filter(ExpertScore.analysis_id == analysis.id)
+        .all()
+    )
+    experts_map: dict[str, dict] = {}
+    for r in expert_rows:
+        entry = experts_map.setdefault(
+            r.expert,
+            {
+                "key": r.expert,
+                "label": expert_label(r.expert, lang),
+                "dimensions": [],
+            },
+        )
+        entry["dimensions"].append(
+            {
+                "key": r.key,
+                "band": r.band,
+                "score": r.score,
+                "rationale": r.rationale,
+                "evidence": json.loads(r.evidence_json or "[]"),
+                "suggestions": json.loads(r.suggestions_json or "[]"),
+            }
+        )
+    for entry in experts_map.values():
+        entry["overall"] = round(
+            sum(d["score"] for d in entry["dimensions"])
+            / max(len(entry["dimensions"]), 1),
+            1,
+        )
+
+    def viewpoints_for(key: str) -> list[dict]:
+        return [
+            {
+                "expert": r.expert,
+                "label": expert_label(r.expert, lang),
+                "rationale": r.rationale,
+            }
+            for r in expert_rows
+            if r.key == key
+        ]
+
     return {
         "id": analysis.id,
         "document_id": analysis.document_id,
         "platform": analysis.platform,
         "overall_score": analysis.overall_score,
         "summary": analysis.summary,
+        "consensus": json.loads(analysis.consensus_json or "{}"),
         "rubric_version": analysis.rubric_version,
         "created_at": analysis.created_at.isoformat() if analysis.created_at else None,
         "dimensions": [
@@ -262,13 +318,16 @@ def _analysis_out(db: Session, analysis: Analysis) -> dict:
                 "label": d.label,
                 "band": d.band,
                 "score": d.score,
+                "spread": d.spread,
                 "weight": d.weight,
                 "rationale": d.rationale,
                 "evidence": json.loads(d.evidence_json or "[]"),
                 "suggestions": json.loads(d.suggestions_json or "[]"),
+                "viewpoints": viewpoints_for(d.key),
             }
             for d in dims
         ],
+        "experts": list(experts_map.values()),
     }
 
 
@@ -306,6 +365,7 @@ def analyze_document(
         platform=result.platform,
         overall_score=result.overall_score,
         summary=result.summary,
+        consensus_json=json.dumps(result.consensus, ensure_ascii=False),
         model=result.model,
         input_tokens=result.input_tokens,
         output_tokens=result.output_tokens,
@@ -321,21 +381,37 @@ def analyze_document(
                 label=d["label"],
                 band=d["band"],
                 score=d["score"],
+                spread=d.get("spread", 0.0),
                 weight=d["weight"],
                 rationale=d["rationale"],
                 evidence_json=json.dumps(d["evidence"], ensure_ascii=False),
                 suggestions_json=json.dumps(d["suggestions"], ensure_ascii=False),
             )
         )
+    for expert in result.experts:
+        for d in expert["dimensions"]:
+            db.add(
+                ExpertScore(
+                    analysis_id=analysis.id,
+                    expert=expert["key"],
+                    key=d["key"],
+                    band=d["band"],
+                    score=d["score"],
+                    rationale=d["rationale"],
+                    evidence_json=json.dumps(d["evidence"], ensure_ascii=False),
+                    suggestions_json=json.dumps(d["suggestions"], ensure_ascii=False),
+                )
+            )
     doc.status = "analyzed"
     db.commit()
     db.refresh(analysis)
-    return _analysis_out(db, analysis)
+    return _analysis_out(db, analysis, lang)
 
 
 @router.get("/{doc_id}/analysis")
 def latest_analysis(
     doc_id: int,
+    lang: str = Query(default="en"),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -348,7 +424,7 @@ def latest_analysis(
     )
     if analysis is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Not analyzed yet")
-    return _analysis_out(db, analysis)
+    return _analysis_out(db, analysis, lang)
 
 
 @router.post("/{doc_id}/rewrite")

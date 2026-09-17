@@ -112,13 +112,13 @@ def test_feedback_and_consent(client):
 
 def test_daily_quota(client):
     token, _ = register_verified(client)
-    for _ in range(5):
+    for _ in range(3):
         doc = _new_doc(client, token)
         assert client.post(
             f"/api/documents/{doc['id']}/analyze", headers=_auth(token)
         ).status_code == 200
-    sixth = _new_doc(client, token)
-    blocked = client.post(f"/api/documents/{sixth['id']}/analyze", headers=_auth(token))
+    fourth = _new_doc(client, token)
+    blocked = client.post(f"/api/documents/{fourth['id']}/analyze", headers=_auth(token))
     assert blocked.status_code == 429
     assert blocked.headers.get("X-Error-Code") == "DAILY_LIMIT_REACHED"
 

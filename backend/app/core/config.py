@@ -96,7 +96,7 @@ class Settings:
         self.retention_days = int(os.getenv("RETENTION_DAYS", "30"))
         # Content-scoring product knobs.
         self.content_max_chars = int(os.getenv("CONTENT_MAX_CHARS", "3000"))
-        self.free_daily_limit = int(os.getenv("FREE_DAILY_LIMIT", "5"))
+        self.free_daily_limit = int(os.getenv("FREE_DAILY_LIMIT", "3"))
         self.rubric_version = os.getenv("RUBRIC_VERSION", "v1")
         self.scoring_cache_enabled = os.getenv(
             "SCORING_CACHE_ENABLED", "true"
