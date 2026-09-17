@@ -24,6 +24,7 @@ type UserRow = {
   email: string;
   plan: string;
   verified: boolean;
+  banned: boolean;
   trial_used: boolean;
   documents: number;
   analyses: number;
@@ -145,6 +146,46 @@ export default function AdminPage() {
       setError(errMessage(err));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const setBan = async (u: UserRow, banned: boolean) => {
+    if (banned && !window.confirm(`停用账号 ${u.email}？该用户将无法登录。`)) return;
+    setError(null);
+    setNotice(null);
+    try {
+      const r = await fetch(`${API_BASE}/admin/users/${u.id}/ban`, {
+        method: "POST",
+        headers: { ...(headers ?? {}), "Content-Type": "application/json" },
+        body: JSON.stringify({ banned }),
+      });
+      if (!r.ok) throw new Error(`Ban ${r.status}: ${(await r.text()).slice(0, 200)}`);
+      setNotice(banned ? `已停用 ${u.email}` : `已启用 ${u.email}`);
+      await load();
+    } catch (err) {
+      setError(errMessage(err));
+    }
+  };
+
+  const deleteUser = async (u: UserRow) => {
+    if (
+      !window.confirm(
+        `彻底删除账号 ${u.email}？\n将同时删除其全部文档、分析记录与用量数据，且不可恢复。`
+      )
+    )
+      return;
+    setError(null);
+    setNotice(null);
+    try {
+      const r = await fetch(`${API_BASE}/admin/users/${u.id}`, {
+        method: "DELETE",
+        headers,
+      });
+      if (!r.ok) throw new Error(`Delete ${r.status}: ${(await r.text()).slice(0, 200)}`);
+      setNotice(`已删除 ${u.email}`);
+      await load();
+    } catch (err) {
+      setError(errMessage(err));
     }
   };
 
@@ -286,12 +327,14 @@ export default function AdminPage() {
                 <tr>
                   <th className="px-5 py-2 font-medium">Email</th>
                   <th className="px-5 py-2 font-medium">Plan</th>
+                  <th className="px-5 py-2 font-medium">Status</th>
                   <th className="px-5 py-2 font-medium">Verified</th>
                   <th className="px-5 py-2 font-medium">Analyses</th>
                   <th className="px-5 py-2 font-medium">Docs</th>
                   <th className="px-5 py-2 font-medium">Today</th>
                   <th className="px-5 py-2 font-medium">Last analysis</th>
                   <th className="px-5 py-2 font-medium">Joined</th>
+                  <th className="px-5 py-2 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
@@ -299,6 +342,13 @@ export default function AdminPage() {
                   <tr key={u.id}>
                     <td className="px-5 py-2 text-zinc-700">{u.email}</td>
                     <td className="px-5 py-2 text-zinc-500">{u.plan}</td>
+                    <td className="px-5 py-2">
+                      {u.banned ? (
+                        <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs text-red-600">已停用</span>
+                      ) : (
+                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-600">正常</span>
+                      )}
+                    </td>
                     <td className="px-5 py-2 text-zinc-500">{u.verified ? "✓" : "—"}</td>
                     <td className="px-5 py-2 text-zinc-700">{u.analyses}</td>
                     <td className="px-5 py-2 text-zinc-500">{u.documents}</td>
@@ -308,6 +358,26 @@ export default function AdminPage() {
                     </td>
                     <td className="px-5 py-2 text-zinc-400">
                       {u.created_at ? new Date(u.created_at).toLocaleDateString() : ""}
+                    </td>
+                    <td className="px-5 py-2">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => void setBan(u, !u.banned)}
+                          className={`rounded-full border px-3 py-1 text-xs transition ${
+                            u.banned
+                              ? "border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+                              : "border-amber-200 text-amber-600 hover:bg-amber-50"
+                          }`}
+                        >
+                          {u.banned ? "启用" : "停用"}
+                        </button>
+                        <button
+                          onClick={() => void deleteUser(u)}
+                          className="rounded-full border border-red-200 px-3 py-1 text-xs text-red-600 transition hover:bg-red-50"
+                        >
+                          删除
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

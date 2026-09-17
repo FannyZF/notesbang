@@ -130,6 +130,43 @@ def test_admin_users_report_usage(client):
         assert row["documents"] == 1
         assert row["analyses_today"] == 1
         assert row["last_analysis_at"]
+        assert row["banned"] is False
         assert "balance" not in row
+    finally:
+        os.environ.pop("ADMIN_TOKEN", None)
+
+
+def test_admin_delete_user_cascades(client):
+    os.environ["ADMIN_TOKEN"] = "test-admin-token"
+    try:
+        token, email = register_verified(client)
+        _make_analysis(client, token)
+        uid = next(
+            u["id"]
+            for u in client.get("/api/admin/users", headers=_admin_headers()).json()
+            if u["email"] == email
+        )
+
+        banned = client.post(
+            f"/api/admin/users/{uid}/ban",
+            headers=_admin_headers(),
+            json={"banned": True},
+        )
+        assert banned.json()["banned"] is True
+        row = next(
+            u
+            for u in client.get("/api/admin/users", headers=_admin_headers()).json()
+            if u["id"] == uid
+        )
+        assert row["banned"] is True
+
+        deleted = client.delete(f"/api/admin/users/{uid}", headers=_admin_headers())
+        assert deleted.status_code == 200, deleted.text
+        remaining = client.get("/api/admin/users", headers=_admin_headers()).json()
+        assert all(u["id"] != uid for u in remaining)
+
+        summary = client.get("/api/admin/summary", headers=_admin_headers()).json()
+        assert summary["totals"]["documents"] == 0
+        assert summary["totals"]["analyses"] == 0
     finally:
         os.environ.pop("ADMIN_TOKEN", None)

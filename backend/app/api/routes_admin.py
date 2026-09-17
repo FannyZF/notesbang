@@ -249,6 +249,95 @@ def admin_set_ban(
     return {"ok": True, "banned": user.banned}
 
 
+@router.delete("/users/{user_id}")
+def admin_delete_user(
+    user_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Permanently delete a user and all data derived from their documents."""
+    _require_admin(request)
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    from app.models import (
+        ApiSession,
+        Analysis,
+        CorpusFeature,
+        DimensionScore,
+        Document,
+        EmailVerificationToken,
+        Entitlement,
+        ExpertScore,
+        Feedback,
+        Job,
+        LedgerEntry,
+        PasswordResetToken,
+        Rewrite,
+        StyleProfile,
+        StyleSample,
+        Subscription,
+        Wallet,
+    )
+
+    doc_ids = [
+        row[0] for row in db.query(Document.id).filter(Document.user_id == user_id).all()
+    ]
+    analysis_ids: list[int] = []
+    if doc_ids:
+        analysis_ids = [
+            row[0]
+            for row in db.query(Analysis.id).filter(Analysis.document_id.in_(doc_ids)).all()
+        ]
+        if analysis_ids:
+            db.query(DimensionScore).filter(
+                DimensionScore.analysis_id.in_(analysis_ids)
+            ).delete(synchronize_session=False)
+            db.query(ExpertScore).filter(
+                ExpertScore.analysis_id.in_(analysis_ids)
+            ).delete(synchronize_session=False)
+        db.query(Analysis).filter(Analysis.document_id.in_(doc_ids)).delete(
+            synchronize_session=False
+        )
+        db.query(Rewrite).filter(Rewrite.document_id.in_(doc_ids)).delete(
+            synchronize_session=False
+        )
+        db.query(CorpusFeature).filter(CorpusFeature.document_id.in_(doc_ids)).delete(
+            synchronize_session=False
+        )
+        db.query(Feedback).filter(Feedback.document_id.in_(doc_ids)).delete(
+            synchronize_session=False
+        )
+        db.query(Job).filter(Job.document_id.in_(doc_ids)).delete(
+            synchronize_session=False
+        )
+        db.query(Document).filter(Document.id.in_(doc_ids)).delete(
+            synchronize_session=False
+        )
+
+    for model in (
+        Feedback,
+        DailyUsage,
+        ApiSession,
+        EmailVerificationToken,
+        PasswordResetToken,
+        LedgerEntry,
+        StyleSample,
+        StyleProfile,
+        Subscription,
+        Entitlement,
+        Wallet,
+    ):
+        db.query(model).filter(model.user_id == user_id).delete(
+            synchronize_session=False
+        )
+
+    db.delete(user)
+    db.commit()
+    return {"ok": True, "deleted": user_id}
+
+
 @router.post("/maintenance/cleanup")
 def run_cleanup(
     request: Request,
@@ -386,6 +475,7 @@ def admin_users(
             "email": u.email,
             "plan": u.plan_state,
             "verified": u.email_verified,
+            "banned": u.banned,
             "trial_used": bool(u.entitlement and u.entitlement.trial_used),
             "documents": int(maps["documents"].get(u.id, 0)),
             "analyses": int(maps["analyses"].get(u.id, 0)),
