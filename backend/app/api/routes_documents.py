@@ -187,6 +187,29 @@ def list_platforms(lang: str = Query(default="en")):
     ]
 
 
+@router.get("/quota")
+def get_quota(
+    user: User = Depends(require_verified),
+    db: Session = Depends(get_db),
+):
+    """Current free daily quota (for proactive UI hints)."""
+    settings = get_settings()
+    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    usage = (
+        db.query(DailyUsage)
+        .filter(DailyUsage.user_id == user.id, DailyUsage.day == day)
+        .first()
+    )
+    used = usage.count if usage else 0
+    limit = settings.free_daily_limit
+    return {
+        "day": day,
+        "limit": limit,
+        "used": used,
+        "remaining": max(0, limit - used),
+    }
+
+
 @router.get("/{doc_id}")
 def get_document(
     doc_id: int,

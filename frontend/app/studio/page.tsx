@@ -88,6 +88,8 @@ export default function StudioPage() {
   const [jobPhase, setJobPhase] = useState("");
   const [jobProgress, setJobProgress] = useState(0);
   const [adopt, setAdopt] = useState<string[]>([]);
+  const [quota, setQuota] = useState<{ limit: number; used: number; remaining: number } | null>(null);
+  const [quotaOpen, setQuotaOpen] = useState(false);
 
   const req = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -136,11 +138,13 @@ export default function StudioPage() {
     if (!token) return;
     (async () => {
       try {
-        const [plats] = (await Promise.all([
+        const [plats, q] = (await Promise.all([
           req(`/documents/platforms?lang=${locale}`),
+          req("/documents/quota"),
           refreshDocs(),
-        ])) as [Platform[], void];
+        ])) as [Platform[], { limit: number; used: number; remaining: number }, void];
         setPlatforms(plats);
+        setQuota(q);
       } catch (err) {
         setNotice({ kind: "err", text: errMessage(err) });
       }
@@ -230,6 +234,10 @@ export default function StudioPage() {
 
   const analyze = async () => {
     if (!current) return;
+    if (quota && quota.remaining <= 0) {
+      setQuotaOpen(true);
+      return;
+    }
     setBusy(true);
     setNotice(null);
     setCard(null);
@@ -261,12 +269,16 @@ export default function StudioPage() {
       const c = (await req(`/documents/${current.id}/analysis?lang=${locale}`)) as Scorecard;
       setCard(c);
       setAdopt((c.experts ?? []).map((e) => e.key));
+      req("/documents/quota")
+        .then((q) => setQuota(q as { limit: number; used: number; remaining: number }))
+        .catch(() => undefined);
     } catch (err) {
       const e = err as Error & { code?: string };
-      setNotice({
-        kind: "err",
-        text: e.code === "DAILY_LIMIT_REACHED" ? t("studio.limit_reached") : errMessage(err),
-      });
+      if (e.code === "DAILY_LIMIT_REACHED") {
+        setQuotaOpen(true);
+      } else {
+        setNotice({ kind: "err", text: errMessage(err) });
+      }
     } finally {
       setBusy(false);
     }
@@ -441,7 +453,15 @@ export default function StudioPage() {
                 <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
                 {t("studio.consent")}
               </label>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-3">
+                {quota && (
+                  <span className="text-xs text-zinc-400">
+                    {t("studio.quota_remaining", {
+                      remaining: String(quota.remaining),
+                      limit: String(quota.limit),
+                    })}
+                  </span>
+                )}
                 <button onClick={createFromPaste} className="rounded-full border border-zinc-300 px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50">
                   {t("studio.new_analysis")}
                 </button>
@@ -831,6 +851,47 @@ export default function StudioPage() {
               ))}
             </div>
           </section>
+        </div>
+      )}
+
+      {quotaOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4 backdrop-blur-sm"
+          onClick={() => setQuotaOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-2xl">
+              ☕
+            </div>
+            <h2 className="mt-4 text-base font-semibold text-zinc-900">
+              {t("studio.quota_title")}
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-zinc-500">
+              {t("studio.quota_body", { limit: String(quota?.limit ?? 3) })}
+            </p>
+            <div className="mt-5 flex flex-col gap-2">
+              <button
+                onClick={() => setQuotaOpen(false)}
+                className="w-full rounded-full bg-zinc-900 px-5 py-2.5 text-sm text-white"
+              >
+                {t("studio.quota_got_it")}
+              </button>
+              <button
+                onClick={() => {
+                  setQuotaOpen(false);
+                  refreshDocs();
+                }}
+                className="w-full rounded-full px-5 py-2.5 text-sm text-zinc-500 hover:bg-zinc-50"
+              >
+                {t("studio.quota_view_history")}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </main>

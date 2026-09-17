@@ -140,6 +140,21 @@ def test_daily_quota(client):
     assert blocked.headers.get("X-Error-Code") == "DAILY_LIMIT_REACHED"
 
 
+def test_quota_endpoint(client):
+    token, _ = register_verified(client)
+    fresh = client.get("/api/documents/quota", headers=_auth(token)).json()
+    assert fresh["remaining"] == fresh["limit"] == 3
+    assert fresh["used"] == 0
+
+    doc = _new_doc(client, token)
+    assert client.post(
+        f"/api/documents/{doc['id']}/analyze", headers=_auth(token)
+    ).status_code == 200
+    after = client.get("/api/documents/quota", headers=_auth(token)).json()
+    assert after["used"] == 1
+    assert after["remaining"] == 2
+
+
 def test_char_cap(client):
     token, _ = register_verified(client)
     r = client.post(

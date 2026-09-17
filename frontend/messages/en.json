@@ -74,6 +74,11 @@
     "weaknesses": "Consensus weaknesses",
     "committee": "Committee",
     "details": "Evidence & suggestions",
+    "quota_remaining": "{remaining}/{limit} analyses left today",
+    "quota_title": "You've used today's free analyses",
+    "quota_body": "Free accounts can run {limit} analyses per day. Your quota resets tomorrow — thanks for using NotesBang!",
+    "quota_got_it": "Got it",
+    "quota_view_history": "View history",
     "viewpoints_aligned": "All experts agree on this dimension.",
     "delete_confirm": "Delete this document and its analysis? This cannot be undone.",
     "deleted": "Document deleted."

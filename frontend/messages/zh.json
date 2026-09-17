@@ -74,6 +74,11 @@
     "weaknesses": "共识劣势",
     "committee": "综合评价",
     "details": "证据与建议",
+    "quota_remaining": "今日剩余 {remaining}/{limit} 次",
+    "quota_title": "今日免费额度已用完",
+    "quota_body": "免费账号每天可分析 {limit} 篇，额度将在明天重置。感谢使用 NotesBang！",
+    "quota_got_it": "知道了",
+    "quota_view_history": "查看历史记录",
     "viewpoints_aligned": "该维度各专家意见一致。",
     "delete_confirm": "删除该文档及其分析结果？此操作不可撤销。",
     "deleted": "文档已删除。"
