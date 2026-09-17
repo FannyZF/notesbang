@@ -9,10 +9,14 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000/api"
 const MAX_CHARS = 3000;
 const PALETTE = ["#2563eb", "#db2777", "#16a34a", "#d97706", "#7c3aed"];
 
-type Platform = { key: string; label: string; dimensions?: { key: string; label: string }[] };
+type Platform = {
+  key: string;
+  label: string;
+  dimensions?: { key: string; label: string; definition?: string }[];
+};
 type Evidence = { quote: string; location?: string; verified?: boolean };
 type Suggestion = { issue: string; fix: string; example: string; location?: string };
-type Viewpoint = { expert: string; label: string; rationale: string };
+type Viewpoint = { expert: string; label: string; rationale: string; band?: number; score?: number };
 type ExpertScorecard = {
   key: string;
   label: string;
@@ -33,6 +37,9 @@ type Dimension = {
 };
 type DiffSegment = { op: "equal" | "insert" | "delete"; text: string };
 type Consensus = {
+  summary?: string;
+  strengths?: string[];
+  weaknesses?: string[];
   top_priorities?: { point: string; impact?: string }[];
   disagreement?: { key: string; note: string }[];
   must_fix?: string[];
@@ -336,6 +343,9 @@ export default function StudioPage() {
 
   const chars = content.trim().length;
   const dims = platforms.find((p) => p.key === platform)?.dimensions ?? [];
+  const highPriorities = (card?.consensus?.top_priorities ?? []).filter(
+    (p) => (p.impact ?? "").toLowerCase() === "high"
+  );
   const toggleFocus = (key: string) =>
     setFocus((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
 
@@ -402,6 +412,7 @@ export default function StudioPage() {
                 {dims.map((d) => (
                   <button
                     key={d.key}
+                    title={d.definition}
                     onClick={() => toggleFocus(d.key)}
                     className={`rounded-full px-3 py-1 font-medium transition ${
                       focus.includes(d.key)
@@ -490,7 +501,9 @@ export default function StudioPage() {
                   {t("studio.overall")}: {card.overall_score}/100
                 </span>
               </div>
-              {card.summary && <p className="mt-3 text-sm text-zinc-600">{card.summary}</p>}
+              {!card.consensus && card.summary && (
+                <p className="mt-3 text-sm text-zinc-600">{card.summary}</p>
+              )}
 
               {card.experts && card.experts.length > 0 && (
                 <div className="mt-6 rounded-2xl border border-zinc-200/80 p-4">
@@ -507,7 +520,7 @@ export default function StudioPage() {
                         }),
                       })),
                       {
-                        label: "Committee",
+                        label: t("studio.committee"),
                         color: "#18181b",
                         values: card.dimensions.map((d) => d.score),
                       },
@@ -525,39 +538,76 @@ export default function StudioPage() {
                     ))}
                     <span className="flex items-center gap-1.5 font-medium text-zinc-700">
                       <span className="inline-block h-2 w-2 rounded-full bg-zinc-900" />
-                      Committee · {card.overall_score}
+                      {t("studio.committee")} · {card.overall_score}
                     </span>
                   </div>
                 </div>
               )}
 
-              {card.consensus &&
-                ((card.consensus.top_priorities?.length ?? 0) > 0 ||
-                  (card.consensus.must_fix?.length ?? 0) > 0) && (
-                  <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    <div className="rounded-2xl bg-zinc-50/80 p-4">
-                      <p className="text-xs font-medium text-zinc-400">{t("studio.priorities")}</p>
-                      <ul className="mt-2 flex flex-col gap-1.5 text-sm text-zinc-600">
-                        {(card.consensus.top_priorities ?? []).map((p, i) => (
-                          <li key={i}>
-                            {p.impact ? `[${p.impact}] ` : ""}
-                            {p.point}
-                          </li>
+              {card.consensus && (
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <div className="rounded-2xl bg-zinc-50/80 p-4 md:col-span-2">
+                    <p className="text-xs font-medium text-zinc-400">
+                      {t("studio.consensus_summary")}
+                    </p>
+                    <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+                      {card.consensus.summary || card.summary || "-"}
+                    </p>
+                  </div>
+
+                  {(card.consensus.strengths?.length ?? 0) > 0 && (
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
+                      <p className="text-xs font-medium text-emerald-700">
+                        {t("studio.strengths")}
+                      </p>
+                      <ul className="mt-2 flex flex-col gap-1.5 text-sm leading-relaxed text-emerald-900">
+                        {card.consensus.strengths!.map((s, i) => (
+                          <li key={i}>· {s}</li>
                         ))}
                       </ul>
                     </div>
-                    {(card.consensus.must_fix?.length ?? 0) > 0 && (
-                      <div className="rounded-2xl bg-amber-50/70 p-4">
-                        <p className="text-xs font-medium text-amber-700">{t("studio.must_fix")}</p>
-                        <ul className="mt-2 flex flex-col gap-1.5 text-sm text-amber-800">
-                          {card.consensus.must_fix!.map((m, i) => (
-                            <li key={i}>{m}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
+                  )}
+
+                  {(card.consensus.weaknesses?.length ?? 0) > 0 && (
+                    <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4">
+                      <p className="text-xs font-medium text-rose-700">
+                        {t("studio.weaknesses")}
+                      </p>
+                      <ul className="mt-2 flex flex-col gap-1.5 text-sm leading-relaxed text-rose-900">
+                        {card.consensus.weaknesses!.map((w, i) => (
+                          <li key={i}>· {w}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {(card.consensus.must_fix?.length ?? 0) > 0 && (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+                      <p className="text-xs font-medium text-red-700">
+                        {t("studio.must_fix")}
+                      </p>
+                      <ul className="mt-2 flex flex-col gap-1.5 text-sm font-medium leading-relaxed text-red-800">
+                        {card.consensus.must_fix!.map((m, i) => (
+                          <li key={i}>· {m}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {highPriorities.length > 0 && (
+                    <div className="rounded-2xl bg-zinc-50/80 p-4">
+                      <p className="text-xs font-medium text-zinc-400">
+                        {t("studio.priorities")}
+                      </p>
+                      <ul className="mt-2 flex flex-col gap-1.5 text-sm leading-relaxed text-zinc-600">
+                        {highPriorities.map((p, i) => (
+                          <li key={i}>· {p.point}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 {[...card.dimensions]
                   .sort((a, b) => b.weight - a.weight)
@@ -600,23 +650,45 @@ export default function StudioPage() {
                         </ul>
                       </div>
                     )}
-                    {d.viewpoints && d.viewpoints.length > 0 && (
-                      <details className="mt-3">
-                        <summary className="cursor-pointer text-xs font-medium text-zinc-400 transition hover:text-zinc-600">
-                          {t("studio.viewpoints")}
-                        </summary>
-                        <ul className="mt-2 flex flex-col gap-2">
-                          {d.viewpoints.map((v) => (
-                            <li
-                              key={v.expert}
-                              className="rounded-lg border border-zinc-100 px-3 py-2 text-xs text-zinc-600"
-                            >
-                              <b>{v.label}</b>：{v.rationale}
-                            </li>
-                          ))}
-                        </ul>
-                      </details>
-                    )}
+                    {d.viewpoints &&
+                      d.viewpoints.length > 0 &&
+                      (() => {
+                        const differing = d.viewpoints!.filter(
+                          (v) => typeof v.band === "number" && v.band !== d.band
+                        );
+                        const seen = new Set<string>();
+                        const list = differing.filter((v) => {
+                          const k = v.rationale.slice(0, 24);
+                          if (seen.has(k)) return false;
+                          seen.add(k);
+                          return true;
+                        });
+                        return (
+                          <details className="mt-3">
+                            <summary className="cursor-pointer text-xs font-medium text-zinc-400 transition hover:text-zinc-600">
+                              {t("studio.viewpoints")}
+                              {list.length > 0 ? ` (${list.length})` : ""}
+                            </summary>
+                            {list.length === 0 ? (
+                              <p className="mt-2 text-xs text-zinc-400">
+                                {t("studio.viewpoints_aligned")}
+                              </p>
+                            ) : (
+                              <ul className="mt-2 flex flex-col gap-2">
+                                {list.map((v) => (
+                                  <li
+                                    key={v.expert}
+                                    className="rounded-lg border border-zinc-100 px-3 py-2 text-xs text-zinc-600"
+                                  >
+                                    <b>{v.label}</b>
+                                    {typeof v.band === "number" ? ` · ${v.band}/5` : ""}：{v.rationale}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </details>
+                        );
+                      })()}
                   </div>
                 ))}
               </div>

@@ -69,6 +69,11 @@
     "adopt": "Adopt expert advice",
     "adopt_hint": "Choose which experts' advice to apply in the rewrite (default: all)",
     "radar": "Expert score profiles",
+    "consensus_summary": "Summary",
+    "strengths": "Consensus strengths",
+    "weaknesses": "Consensus weaknesses",
+    "committee": "Committee",
+    "viewpoints_aligned": "All experts agree on this dimension.",
     "delete_confirm": "Delete this document and its analysis? This cannot be undone.",
     "deleted": "Document deleted."
   }

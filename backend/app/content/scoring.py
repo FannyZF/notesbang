@@ -65,12 +65,14 @@ _SCORE_RULES = (
 
 _CHAIR_SYSTEM = (
     "You are the committee chair. Do NOT change any scores. Given the five "
-    "reviewers' rationales, produce a concise consensus: an overall summary, the "
-    "top priorities (ranked), the dimensions where reviewers disagree (and why), and "
-    "a must-fix list drawn from compliance issues. "
-    'Output strict JSON: {"summary":"...","top_priorities":[{"point":"...",'
-    '"impact":"high|med|low"}],"disagreement":[{"key":"hook","note":"..."}],'
-    '"must_fix":["..."]}'
+    "reviewers' rationales, produce a concise consensus: a short overall summary, "
+    "the consensus STRENGTHS (what clearly works), the consensus WEAKNESSES (what "
+    "clearly doesn't), the top priorities (only high-impact items), the dimensions "
+    "where reviewers disagree (and why), and a must-fix list drawn from compliance "
+    "issues. Keep each bullet short and specific; avoid repeating the same point. "
+    'Output strict JSON: {"summary":"...","strengths":["..."],"weaknesses":["..."],'
+    '"top_priorities":[{"point":"...","impact":"high|med|low"}],'
+    '"disagreement":[{"key":"hook","note":"..."}],"must_fix":["..."]}'
 )
 
 
@@ -104,6 +106,8 @@ class _ScoreOut(BaseModel):
 
 class _ChairOut(BaseModel):
     summary: str = ""
+    strengths: list[str] = Field(default_factory=list)
+    weaknesses: list[str] = Field(default_factory=list)
     top_priorities: list[dict] = Field(default_factory=list)
     disagreement: list[dict] = Field(default_factory=list)
     must_fix: list[str] = Field(default_factory=list)
@@ -228,7 +232,14 @@ def _mock_result(
         overall_score=_weighted_overall(committee),
         dimensions=committee,
         experts=experts_out,
-        consensus={"top_priorities": [], "disagreement": [], "must_fix": []},
+        consensus={
+            "summary": "",
+            "strengths": [],
+            "weaknesses": [],
+            "top_priorities": [],
+            "disagreement": [],
+            "must_fix": [],
+        },
         model="mock-v1",
         rubric_version=get_settings().rubric_version,
     )
@@ -403,7 +414,14 @@ def analyze(
         + "\n".join(f"{d['key']}({d['band']},{d['score']}): {d['rationale']}" for d in e["dimensions"])
         for e in experts_out
     )
-    consensus = {"top_priorities": [], "disagreement": [], "must_fix": []}
+    consensus = {
+        "summary": "",
+        "strengths": [],
+        "weaknesses": [],
+        "top_priorities": [],
+        "disagreement": [],
+        "must_fix": [],
+    }
     summary = ""
     try:
         chair_call = provider.chat(_CHAIR_SYSTEM, chair_user, json_mode=True)
@@ -412,6 +430,9 @@ def analyze(
         cost += chair_call.cost_est
         chair = _ChairOut.model_validate(json.loads(chair_call.text))
         consensus = {
+            "summary": chair.summary,
+            "strengths": chair.strengths,
+            "weaknesses": chair.weaknesses,
             "top_priorities": chair.top_priorities,
             "disagreement": chair.disagreement,
             "must_fix": chair.must_fix,

@@ -175,7 +175,11 @@ def list_platforms(lang: str = Query(default="en")):
             "label": p.label_zh if zh else p.label_en,
             "weights": p.weights,
             "dimensions": [
-                {"key": d.key, "label": d.label_zh if zh else d.label_en}
+                {
+                    "key": d.key,
+                    "label": d.label_zh if zh else d.label_en,
+                    "definition": d.definition_zh if zh else d.definition_en,
+                }
                 for d in rubric.dimensions
             ],
         }
@@ -305,6 +309,8 @@ def _analysis_out(db: Session, analysis: Analysis, lang: str = "en") -> dict:
                 "expert": r.expert,
                 "label": expert_label(r.expert, lang),
                 "rationale": r.rationale,
+                "band": r.band,
+                "score": r.score,
             }
             for r in expert_rows
             if r.key == key
