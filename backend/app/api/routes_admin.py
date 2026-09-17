@@ -22,6 +22,7 @@ from app.models import (
     DailyUsage,
     Document,
     Entitlement,
+    PageView,
     User,
 )
 from app.schemas import AdminBanIn, AdminPlanIn, AdminSettingsIn, AdminTestEmailIn
@@ -279,6 +280,86 @@ def admin_test_email(
             headers={"X-Error-Code": "SMTP_SEND_FAILED"},
         ) from exc
     return {**result, "to": payload.to}
+
+
+@router.get("/traffic")
+def admin_traffic(
+    request: Request,
+    days: int = Query(default=30, ge=1, le=365),
+    db: Session = Depends(get_db),
+):
+    """Privacy-friendly site traffic: PV/UV, daily series, top pages/referrers.
+
+    Bots are counted separately and excluded from the headline numbers.
+    """
+    _require_admin(request)
+    today = _today()
+    since = (datetime.now(timezone.utc) - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    human = PageView.is_bot.is_(False)
+    distinct_visitors = func.count(func.distinct(PageView.visitor_hash))
+
+    pv = db.query(func.count(PageView.id)).filter(human, PageView.day >= since).scalar() or 0
+    uv = db.query(distinct_visitors).filter(human, PageView.day >= since).scalar() or 0
+    bots = (
+        db.query(func.count(PageView.id))
+        .filter(PageView.is_bot.is_(True), PageView.day >= since)
+        .scalar()
+        or 0
+    )
+    pv_today = (
+        db.query(func.count(PageView.id)).filter(human, PageView.day == today).scalar() or 0
+    )
+    uv_today = db.query(distinct_visitors).filter(human, PageView.day == today).scalar() or 0
+
+    series_rows = (
+        db.query(PageView.day, func.count(PageView.id), distinct_visitors)
+        .filter(human, PageView.day >= since)
+        .group_by(PageView.day)
+        .all()
+    )
+    series_map = {day: (int(p), int(u)) for day, p, u in series_rows}
+    start = datetime.now(timezone.utc) - timedelta(days=days - 1)
+    series = []
+    for i in range(days):
+        day = (start + timedelta(days=i)).strftime("%Y-%m-%d")
+        p, u = series_map.get(day, (0, 0))
+        series.append({"day": day, "pv": p, "uv": u})
+
+    top_paths = [
+        {"path": path, "pv": int(p), "uv": int(u)}
+        for path, p, u in (
+            db.query(PageView.path, func.count(PageView.id), distinct_visitors)
+            .filter(human, PageView.day >= since)
+            .group_by(PageView.path)
+            .order_by(func.count(PageView.id).desc())
+            .limit(10)
+            .all()
+        )
+    ]
+    top_referrers = [
+        {"host": host or "(direct)", "pv": int(p)}
+        for host, p in (
+            db.query(PageView.referrer_host, func.count(PageView.id))
+            .filter(human, PageView.day >= since)
+            .group_by(PageView.referrer_host)
+            .order_by(func.count(PageView.id).desc())
+            .limit(10)
+            .all()
+        )
+    ]
+    return {
+        "days": days,
+        "totals": {
+            "pv": int(pv),
+            "uv": int(uv),
+            "pv_today": int(pv_today),
+            "uv_today": int(uv_today),
+            "bots": int(bots),
+        },
+        "series": series,
+        "top_paths": top_paths,
+        "top_referrers": top_referrers,
+    }
 
 
 @router.post("/users/{user_id}/plan")

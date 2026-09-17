@@ -73,6 +73,13 @@ type SettingsForm = {
   app_base_url: string;
   public_web_url: string;
 };
+type Traffic = {
+  days: number;
+  totals: { pv: number; uv: number; pv_today: number; uv_today: number; bots: number };
+  series: { day: string; pv: number; uv: number }[];
+  top_paths: { path: string; pv: number; uv: number }[];
+  top_referrers: { host: string; pv: number }[];
+};
 
 export default function AdminPage() {
   const [token, setToken] = useState<string | null>(() => {
@@ -83,6 +90,8 @@ export default function AdminPage() {
   const [totals, setTotals] = useState<Totals | null>(null);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [traffic, setTraffic] = useState<Traffic | null>(null);
+  const [trafficDays, setTrafficDays] = useState(30);
   const [form, setForm] = useState<SettingsForm | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -101,10 +110,11 @@ export default function AdminPage() {
     setBusy(true);
     setError(null);
     try {
-      const [s, u, cfg] = await Promise.all([
+      const [s, u, cfg, tr] = await Promise.all([
         fetch(`${API_BASE}/admin/summary`, { headers }),
         fetch(`${API_BASE}/admin/users?limit=100`, { headers }),
         fetch(`${API_BASE}/admin/settings`, { headers }),
+        fetch(`${API_BASE}/admin/traffic?days=${trafficDays}`, { headers }),
       ]);
       if (!s.ok) throw new Error(`Summary ${s.status}: ${(await s.text()).slice(0, 160)}`);
       if (!u.ok) throw new Error(`Users ${u.status}: ${(await u.text()).slice(0, 160)}`);
@@ -112,6 +122,7 @@ export default function AdminPage() {
       const sData = (await s.json()) as { totals: Totals; recent_users: UserRow[] };
       setTotals(sData.totals);
       setUsers((await u.json()) as UserRow[]);
+      if (tr.ok) setTraffic((await tr.json()) as Traffic);
       const cfgData = (await cfg.json()) as Settings;
       setSettings(cfgData);
       setForm({
@@ -138,7 +149,7 @@ export default function AdminPage() {
     } finally {
       setBusy(false);
     }
-  }, [token, headers]);
+  }, [token, headers, trafficDays]);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -336,6 +347,116 @@ export default function AdminPage() {
               <p className="mt-1 text-2xl font-semibold tracking-tight">{s.value}</p>
             </div>
           ))}
+        </section>
+      )}
+
+      {traffic && (
+        <section className="rounded-2xl border border-zinc-200/80 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-medium text-zinc-700">Traffic</h2>
+            <div className="flex items-center gap-2 text-xs text-zinc-500">
+              <span>Range</span>
+              <select
+                className="rounded-lg border border-zinc-200 px-2 py-1"
+                value={trafficDays}
+                onChange={(e) => setTrafficDays(Number(e.target.value))}
+              >
+                {[7, 30, 90].map((d) => (
+                  <option key={d} value={d}>
+                    {d} days
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { label: `Page views (${traffic.days}d)`, value: traffic.totals.pv },
+              { label: `Visitors (${traffic.days}d)`, value: traffic.totals.uv },
+              { label: "PV today", value: traffic.totals.pv_today },
+              { label: "UV today", value: traffic.totals.uv_today },
+            ].map((s) => (
+              <div key={s.label} className="rounded-2xl border border-zinc-200/80 p-4">
+                <p className="text-xs text-zinc-400">{s.label}</p>
+                <p className="mt-1 text-2xl font-semibold tracking-tight">{s.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {(() => {
+            const max = Math.max(1, ...traffic.series.map((d) => d.pv));
+            return (
+              <div className="mt-5">
+                <p className="text-xs text-zinc-400">Daily page views</p>
+                <div className="mt-2 flex h-24 items-end gap-[3px]">
+                  {traffic.series.map((d) => (
+                    <div
+                      key={d.day}
+                      title={`${d.day}: ${d.pv} PV / ${d.uv} UV`}
+                      className="min-w-[3px] flex-1 rounded-t bg-zinc-800/80"
+                      style={{ height: `${Math.max(2, (d.pv / max) * 100)}%` }}
+                    />
+                  ))}
+                </div>
+                <div className="mt-1 flex justify-between text-[11px] text-zinc-400">
+                  <span>{traffic.series[0]?.day}</span>
+                  <span>{traffic.series[traffic.series.length - 1]?.day}</span>
+                </div>
+              </div>
+            );
+          })()}
+
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="overflow-hidden rounded-xl border border-zinc-100">
+              <div className="border-b border-zinc-100 px-4 py-2 text-xs font-medium text-zinc-500">
+                Top pages
+              </div>
+              <table className="w-full text-left text-sm">
+                <tbody className="divide-y divide-zinc-100">
+                  {traffic.top_paths.length === 0 && (
+                    <tr>
+                      <td className="px-4 py-2 text-xs text-zinc-400">No data yet</td>
+                    </tr>
+                  )}
+                  {traffic.top_paths.map((p) => (
+                    <tr key={p.path}>
+                      <td className="px-4 py-2 text-zinc-700">{p.path}</td>
+                      <td className="px-4 py-2 text-right text-zinc-500">
+                        {p.pv} PV · {p.uv} UV
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="overflow-hidden rounded-xl border border-zinc-100">
+              <div className="border-b border-zinc-100 px-4 py-2 text-xs font-medium text-zinc-500">
+                Top referrers
+              </div>
+              <table className="w-full text-left text-sm">
+                <tbody className="divide-y divide-zinc-100">
+                  {traffic.top_referrers.length === 0 && (
+                    <tr>
+                      <td className="px-4 py-2 text-xs text-zinc-400">No data yet</td>
+                    </tr>
+                  )}
+                  {traffic.top_referrers.map((r) => (
+                    <tr key={r.host}>
+                      <td className="px-4 py-2 text-zinc-700">{r.host}</td>
+                      <td className="px-4 py-2 text-right text-zinc-500">{r.pv} PV</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <p className="mt-3 text-[11px] text-zinc-400">
+            隐私友好统计：不使用 cookie，不保存明文 IP（仅按「IP+UA+月份」的哈希去重）；
+            已过滤爬虫（{traffic.totals.bots} 次机器人访问未计入）。
+          </p>
         </section>
       )}
 

@@ -320,3 +320,25 @@ class AppSetting(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
     )
+
+
+class PageView(Base):
+    """Privacy-friendly traffic counter.
+
+    No cookies and no raw IPs: ``visitor_hash`` is a salted digest of
+    (IP + user agent + month) so daily/UV counts work without being able to
+    identify or track a person across months.
+    """
+
+    __tablename__ = "page_views"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    day: Mapped[str] = mapped_column(String(10), index=True)  # YYYY-MM-DD (UTC)
+    path: Mapped[str] = mapped_column(String(200), index=True, default="/")
+    referrer_host: Mapped[str] = mapped_column(String(200), default="")
+    visitor_hash: Mapped[str] = mapped_column(String(32), index=True, default="")
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
+    is_bot: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)

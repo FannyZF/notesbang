@@ -15,6 +15,7 @@ from app.api import (
     routes_billing,
     routes_documents,
     routes_jobs,
+    routes_track,
 )
 from app.core.config import get_settings
 from app.core.metrics import HTTP_LATENCY, HTTP_REQUESTS, render_metrics
@@ -80,6 +81,7 @@ app.include_router(routes_billing.router, prefix=API_PREFIX)
 app.include_router(routes_admin.router, prefix=API_PREFIX)
 app.include_router(routes_documents.router, prefix=API_PREFIX)
 app.include_router(routes_jobs.router, prefix=API_PREFIX)
+app.include_router(routes_track.router, prefix=API_PREFIX)
 
 
 @app.get("/healthz", tags=["system"])

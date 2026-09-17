@@ -51,6 +51,7 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
       ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      TRACK_SALT: ${TRACK_SALT:-notesbang}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       LLM_PROVIDER: ${LLM_PROVIDER:-mock}
       PUBLIC_WEB_URL: ${PUBLIC_ORIGIN:-http://localhost:8088}

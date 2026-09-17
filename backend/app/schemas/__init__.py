@@ -73,6 +73,11 @@ class AdminTestEmailIn(BaseModel):
     to: EmailStr
 
 
+class TrackIn(BaseModel):
+    path: str = Field(default="/", max_length=200)
+    referrer: str | None = Field(default=None, max_length=500)
+
+
 class AdminPlanIn(BaseModel):
     plan_state: str = Field(pattern="^(trial|active|subscriber)$")
 

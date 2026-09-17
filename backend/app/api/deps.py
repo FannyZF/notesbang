@@ -51,3 +51,23 @@ def require_verified(user: User = Depends(get_current_user)) -> User:
             headers={"X-Error-Code": "EMAIL_NOT_VERIFIED"},
         )
     return user
+
+
+def get_optional_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: Session = Depends(get_db),
+) -> User | None:
+    """Like get_current_user but returns None instead of raising (public endpoints)."""
+    if credentials is None or not credentials.credentials:
+        return None
+    session = (
+        db.query(ApiSession)
+        .filter(ApiSession.token_digest == token_digest(credentials.credentials))
+        .first()
+    )
+    if session is None:
+        return None
+    user = db.get(User, session.user_id)
+    if user is None or getattr(user, "banned", False):
+        return None
+    return user

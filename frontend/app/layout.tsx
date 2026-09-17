@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import PageView from "../components/PageView";
 import { LocaleProvider } from "../lib/i18n";
 
 export const metadata: Metadata = {
@@ -13,6 +14,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
         <LocaleProvider>{children}</LocaleProvider>
+        <PageView />
       </body>
     </html>
   );
