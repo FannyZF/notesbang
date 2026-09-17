@@ -1,6 +1,7 @@
-# Production-ish stack: Postgres + Redis + MinIO + API + Celery worker/beat
+# Production stack: Postgres + Redis + API (FastAPI) + Celery worker/beat
 # + Next.js web + Caddy. Set PUBLIC_ORIGIN / HTTP_PORT / SITE_ADDRESS and
-# secrets via .env (default public port is 8088).
+# secrets via .env (default public port is 8088). Images are published to GHCR
+# by GitHub Actions; `docker compose pull` uses them, `--build` builds locally.
 services:
   postgres:
     image: postgres:16-alpine
@@ -15,16 +16,23 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     command: redis-server --appendonly yes
     volumes:
       - redisdata:/data
+    restart: unless-stopped
 
   api:
     image: ${IMAGE_PREFIX:-ghcr.io/fannyzf}/notesbang-api:${IMAGE_TAG:-latest}
     build: ./backend
+    # Explicit command so the API runs even with an image that only defines an
+    # entrypoint; --forwarded-allow-ips makes Caddy's X-Forwarded-For trusted
+    # (real client IPs for rate limiting).
+    command: "uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=*"
+    restart: unless-stopped
     environment:
       ENVIRONMENT: production
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-notesbang}:${POSTGRES_PASSWORD:-notesbang_dev}@postgres:5432/${POSTGRES_DB:-notesbang}
@@ -52,10 +60,18 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), 3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
   worker:
+    image: ${IMAGE_PREFIX:-ghcr.io/fannyzf}/notesbang-api:${IMAGE_TAG:-latest}
     build: ./backend
     command: celery -A app.workers.celery_app.celery_app worker -Q jobs --loglevel=info
+    restart: unless-stopped
     environment:
       RUN_MIGRATIONS: "false"
       ENVIRONMENT: production
@@ -70,8 +86,10 @@ services:
       - api
 
   beat:
+    image: ${IMAGE_PREFIX:-ghcr.io/fannyzf}/notesbang-api:${IMAGE_TAG:-latest}
     build: ./backend
     command: celery -A app.workers.celery_app.celery_app beat --loglevel=info
+    restart: unless-stopped
     environment:
       RUN_MIGRATIONS: "false"
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-notesbang}:${POSTGRES_PASSWORD:-notesbang_dev}@postgres:5432/${POSTGRES_DB:-notesbang}
@@ -89,6 +107,7 @@ services:
         # Relative base: the web app and /api share one origin via Caddy, so
         # the same image works on any domain/port without rebuilding.
         NEXT_PUBLIC_API_BASE: /api
+    restart: unless-stopped
     depends_on:
       - api
 
@@ -106,8 +125,11 @@ services:
       - caddydata:/data
       - caddyconfig:/config
     depends_on:
-      - web
-      - api
+      web:
+        condition: service_started
+      api:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   pgdata:
