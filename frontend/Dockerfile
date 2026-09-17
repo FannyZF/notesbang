@@ -6,7 +6,7 @@ RUN npm ci --no-audit --no-fund
 
 FROM node:20-alpine AS build
 WORKDIR /app
-ARG NEXT_PUBLIC_API_BASE=http://localhost:8000/api
+ARG NEXT_PUBLIC_API_BASE=/api
 ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules

@@ -23,6 +23,7 @@ services:
       - redisdata:/data
 
   api:
+    image: ${IMAGE_PREFIX:-ghcr.io/fannyzf}/notesbang-api:${IMAGE_TAG:-latest}
     build: ./backend
     environment:
       ENVIRONMENT: production
@@ -81,10 +82,13 @@ services:
       - redis
 
   web:
+    image: ${IMAGE_PREFIX:-ghcr.io/fannyzf}/notesbang-web:${IMAGE_TAG:-latest}
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_BASE: ${PUBLIC_ORIGIN:-http://localhost:8088}/api
+        # Relative base: the web app and /api share one origin via Caddy, so
+        # the same image works on any domain/port without rebuilding.
+        NEXT_PUBLIC_API_BASE: /api
     depends_on:
       - api
 

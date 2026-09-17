@@ -21,10 +21,24 @@ HTTP_PORT=80
 HTTPS_PORT=443
 ```
 
-`PUBLIC_ORIGIN` feeds `APP_BASE_URL` / `PUBLIC_WEB_URL` (email links) and the
-frontend's `NEXT_PUBLIC_API_BASE` (`<PUBLIC_ORIGIN>/api`) — it must be the URL
-users actually open, or verification links will be unreachable. Changing it
-requires rebuilding the web image (`docker compose up -d --build web`).
+`PUBLIC_ORIGIN` feeds `APP_BASE_URL` / `PUBLIC_WEB_URL` (email links) — it must be
+the URL users actually open, or verification links will be unreachable. The
+frontend calls the API on a relative `/api` path, so changing `PUBLIC_ORIGIN`
+only needs `docker compose up -d api` (no web rebuild).
+
+## Images (GHCR)
+GitHub Actions (`.github/workflows/release.yml`) builds and pushes
+`ghcr.io/<owner>/notesbang-api` and `ghcr.io/<owner>/notesbang-web` on every
+push to `master`. The server pulls instead of building:
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+- Make the packages **public** (repo → Packages → package settings → Change
+  visibility) **or** authenticate once: `echo $PAT | docker login ghcr.io -u <user> --password-stdin`.
+- Pin a specific build with `IMAGE_TAG=<git-sha>` in `.env`.
+- To build locally instead: `docker compose up -d --build`.
 
 ## Server sizing
 
@@ -57,7 +71,8 @@ Rules of thumb:
 ## First deploy
 ```bash
 cp .env.example .env      # fill PUBLIC_ORIGIN, DEEPSEEK_API_KEY, ADMIN_TOKEN, SMTP_*, passwords
-docker compose up -d --build
+docker compose pull       # fetch images built by GitHub Actions (see "Images")
+docker compose up -d
 ```
 The API container runs `alembic upgrade head` on start (`RUN_MIGRATIONS=true`).
 
