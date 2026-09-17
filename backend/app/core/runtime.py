@@ -130,12 +130,25 @@ def mail_config(db: Session) -> dict:
 _LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"})
 
 
-def is_local_url(url: str) -> bool:
-    """True when the URL points at a loopback/unspecified host (unreachable by mail recipients)."""
+def _host_of(url: str) -> str:
     from urllib.parse import urlparse
 
-    host = (urlparse(url).hostname or "").lower()
-    return host in _LOCAL_HOSTS
+    return (urlparse(url).hostname or "").lower()
+
+
+def is_local_url(url: str) -> bool:
+    """True when the URL points at a loopback/unspecified host (unreachable by mail recipients)."""
+    return _host_of(url) in _LOCAL_HOSTS
+
+
+def _is_ip(host: str) -> bool:
+    import ipaddress
+
+    try:
+        ipaddress.ip_address(host)
+        return True
+    except ValueError:
+        return False
 
 
 def mail_warnings(db: Session) -> list[dict]:
@@ -152,6 +165,17 @@ def mail_warnings(db: Session) -> list[dict]:
                     "已启用 SMTP 发信，但邮件链接域名（API base URL）仍是本地地址 "
                     f"（{cfg['app_base_url']}），收件人无法打开验证链接。"
                     "请填写可公开访问的站点地址，例如 https://your-domain。"
+                ),
+            }
+        )
+    elif _is_ip(_host_of(cfg["app_base_url"])):
+        warnings.append(
+            {
+                "code": "smtp_ip_link",
+                "message": (
+                    "邮件链接目前使用 IP 地址 "
+                    f"（{cfg['app_base_url']}）。建议改为你的域名（如 https://your-domain），"
+                    "否则邮件里的验证链接会暴露 IP、且 IP 变更后即失效。"
                 ),
             }
         )

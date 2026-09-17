@@ -421,6 +421,9 @@ export default function AdminPage() {
             </label>
             {field("app_base_url", "API base URL (email links)", { placeholder: "https://your-domain" })}
             <p className="col-span-full -mt-2 text-[11px] leading-relaxed text-zinc-400">
+              当前邮件链接前缀：
+              <span className="font-medium text-zinc-700">{settings.app_base_url}</span>
+              <br />
               必须是可公开访问的站点地址（如 https://your-domain）。/verify、/reset 是前端页面，
               请填站点地址，不要填 .../api。
             </p>

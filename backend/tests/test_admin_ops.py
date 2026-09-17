@@ -213,6 +213,14 @@ def test_admin_url_validation_and_warnings(client, monkeypatch):
         )
         assert fixed.status_code == 200
         assert fixed.json()["warnings"] == []
+
+        ip_link = client.put(
+            "/api/admin/settings",
+            headers=_admin_headers(),
+            json={"app_base_url": "http://203.0.113.10:8088"},
+        )
+        assert ip_link.status_code == 200
+        assert {w["code"] for w in ip_link.json()["warnings"]} == {"smtp_ip_link"}
     finally:
         os.environ.pop("ADMIN_TOKEN", None)
 
