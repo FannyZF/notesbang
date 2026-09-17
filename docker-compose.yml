@@ -120,6 +120,8 @@ services:
       # ":80" serves plain HTTP for any host (IP:PORT access). For a real
       # domain with automatic HTTPS set SITE_ADDRESS=yourdomain.com.
       SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      # Contact email for Let's Encrypt certificate notices.
+      ACME_EMAIL: ${ACME_EMAIL:-yueng@qq.com}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddydata:/data

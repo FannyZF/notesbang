@@ -1,3 +1,8 @@
+{
+	# Contact address for Let's Encrypt (certificate expiry notices).
+	email {$ACME_EMAIL:yueng@qq.com}
+}
+
 {$SITE_ADDRESS:localhost} {
 	encode gzip
 
