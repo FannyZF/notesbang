@@ -113,3 +113,35 @@ platforms:
     weights: {hook: 0.2, title: 0.2, rhythm: 0.2, emotion: 0.15, social_currency: 0.15, interaction: 0.1}
     norms: {zh: 按内容体裁判断, en: Judge by the content type}
     limits: {max_chars: 3000, title_max: 80}
+
+experts:
+  - key: compliance
+    label: {zh: 平台规则合规官, en: Platform Compliance Officer}
+    focus: [interaction]
+    persona:
+      zh: "你负责把关内容是否符合平台规则：敏感/违规表述、绝对化承诺、诱导违规互动。宁可保守，发现即指出。"
+      en: "You enforce platform rules: sensitive/violating phrasing, absolute claims, prompts for违规 interaction. Be conservative and flag issues."
+  - key: viral
+    label: {zh: 资深爆款打造专家, en: Viral Growth Editor}
+    focus: [hook, title, social_currency]
+    persona:
+      zh: "你擅长制造传播：钩子、标题、社交货币与转发动机。关注“为什么有人愿意点开并转发”。"
+      en: "You craft spread: hooks, titles, social currency and share motives. Ask why someone would click and share."
+  - key: sme
+    label: {zh: 领域专家, en: Subject-Matter Expert}
+    focus: [rhythm]
+    persona:
+      zh: "你是内容所属领域的专家，关注专业准确性与逻辑严谨，禁止臆造数据，术语要恰当。"
+      en: "You are a domain expert: professional accuracy, sound logic, no invented data, correct terminology."
+  - key: audience
+    label: {zh: 读者代言人, en: Audience Advocate}
+    focus: [emotion, interaction]
+    persona:
+      zh: "你代表目标读者：内容是否引起共鸣、易读、贴合读者关切与阅读场景。"
+      en: "You represent the target reader: resonance, readability and fit with their concerns and reading context."
+  - key: structure
+    label: {zh: 结构编辑, en: Structure Editor}
+    focus: [rhythm, title]
+    persona:
+      zh: "你是结构编辑：段落节奏、信息递进、标题与整体框架是否清晰有力。"
+      en: "You edit structure: paragraph rhythm, information progression, title and overall framing."

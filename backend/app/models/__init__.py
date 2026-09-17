@@ -101,6 +101,7 @@ class Job(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     project_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    document_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     type: Mapped[str] = mapped_column(String(24))
     target_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="queued")
@@ -212,6 +213,7 @@ class Analysis(Base):
     platform: Mapped[str] = mapped_column(String(24), default="")
     overall_score: Mapped[float] = mapped_column(default=0.0)
     summary: Mapped[str] = mapped_column(Text, default="")
+    consensus_json: Mapped[str] = mapped_column(Text, default="{}")
     model: Mapped[str] = mapped_column(String(64), default="")
     input_tokens: Mapped[int] = mapped_column(Integer, default=0)
     output_tokens: Mapped[int] = mapped_column(Integer, default=0)
@@ -228,7 +230,22 @@ class DimensionScore(Base):
     label: Mapped[str] = mapped_column(String(120), default="")
     band: Mapped[int] = mapped_column(Integer, default=0)  # 1..5
     score: Mapped[int] = mapped_column(Integer, default=0)  # mapped from band
+    spread: Mapped[float] = mapped_column(default=0.0)  # committee disagreement
     weight: Mapped[float] = mapped_column(default=0.0)
+    rationale: Mapped[str] = mapped_column(Text, default="")
+    evidence_json: Mapped[str] = mapped_column(Text, default="[]")
+    suggestions_json: Mapped[str] = mapped_column(Text, default="[]")
+
+
+class ExpertScore(Base):
+    __tablename__ = "expert_scores"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    analysis_id: Mapped[int] = mapped_column(ForeignKey("analyses.id"), index=True)
+    expert: Mapped[str] = mapped_column(String(32), index=True)
+    key: Mapped[str] = mapped_column(String(32))
+    band: Mapped[int] = mapped_column(Integer, default=0)
+    score: Mapped[int] = mapped_column(Integer, default=0)
     rationale: Mapped[str] = mapped_column(Text, default="")
     evidence_json: Mapped[str] = mapped_column(Text, default="[]")
     suggestions_json: Mapped[str] = mapped_column(Text, default="[]")

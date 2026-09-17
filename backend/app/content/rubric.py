@@ -38,12 +38,23 @@ class Platform:
 
 
 @dataclass
+class Expert:
+    key: str
+    label_zh: str
+    label_en: str
+    persona_zh: str
+    persona_en: str
+    focus: list
+
+
+@dataclass
 class Rubric:
     version: str
     band_scores: dict
     band_ranges: dict
     dimensions: list[Dimension]
     platforms: dict
+    experts: list[Expert]
 
 
 @lru_cache
@@ -83,7 +94,29 @@ def load_rubric() -> Rubric:
         },
         dimensions=dims,
         platforms=platforms,
+        experts=[
+            Expert(
+                key=e["key"],
+                label_zh=e["label"]["zh"],
+                label_en=e["label"]["en"],
+                persona_zh=e["persona"]["zh"],
+                persona_en=e["persona"]["en"],
+                focus=list(e.get("focus", [])),
+            )
+            for e in data.get("experts", [])
+        ],
     )
+
+
+def experts() -> list[Expert]:
+    return load_rubric().experts
+
+
+def expert_label(key: str, lang: str) -> str:
+    for e in load_rubric().experts:
+        if e.key == key:
+            return e.label_zh if lang.startswith("zh") else e.label_en
+    return key
 
 
 def band_to_score(band: int) -> int:
