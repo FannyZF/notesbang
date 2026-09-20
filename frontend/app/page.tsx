@@ -398,12 +398,27 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="bg-zinc-950 py-20 text-center text-white">
-        <h2 className="mx-auto max-w-2xl px-6 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{c.cta.title}</h2>
-        <p className="mx-auto mt-4 max-w-xl px-6 text-zinc-400">{c.cta.sub}</p>
-        <Link href="/studio" className="mt-8 inline-flex items-center justify-center rounded-full bg-white px-7 py-3 text-[15px] font-medium text-zinc-900 transition hover:bg-zinc-200 active:scale-[0.98]">
-          {c.cta.button}
-        </Link>
+      <section className="relative overflow-hidden bg-zinc-950 py-20 text-center text-white">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px)",
+            backgroundSize: "56px 56px",
+            maskImage:
+              "radial-gradient(ellipse 70% 60% at 50% 40%, #000 20%, transparent 75%)",
+            WebkitMaskImage:
+              "radial-gradient(ellipse 70% 60% at 50% 40%, #000 20%, transparent 75%)",
+          }}
+        />
+        <div className="relative">
+          <h2 className="mx-auto max-w-2xl px-6 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{c.cta.title}</h2>
+          <p className="mx-auto mt-4 max-w-xl px-6 text-zinc-400">{c.cta.sub}</p>
+          <Link href="/studio" className="mt-8 inline-flex items-center justify-center rounded-full bg-white px-7 py-3 text-[15px] font-medium text-zinc-900 transition hover:bg-zinc-200 active:scale-[0.98]">
+            {c.cta.button}
+          </Link>
+        </div>
       </section>
 
       <footer className="bg-zinc-950 pb-10 pt-2 text-sm text-zinc-500">
