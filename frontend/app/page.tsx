@@ -1,7 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import {
+  DownloadSimple,
+  Gift,
+  ListChecks,
+  MagicWand,
+  Quotes,
+  SquaresFour,
+} from "@phosphor-icons/react/dist/ssr";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import RadarChart from "../components/RadarChart";
 import Reveal from "../components/Reveal";
 import { FREE_DAILY_LIMIT } from "../lib/config";
 import { useI18n } from "../lib/i18n";
@@ -9,7 +18,8 @@ import { useI18n } from "../lib/i18n";
 type Copy = {
   nav: { features: string; how: string; faq: string; open: string };
   hero: { badge: string; title1: string; title2: string; sub: string; cta: string; more: string };
-  mock: { title: string; platform: string; overall: string; dim: string; band: string; quote: string; suggestion: string };
+  mock: { title: string; platform: string; overall: string; dim: string; band: string; quote: string; suggestion: string; evidence: string; dims: { t: string; v: number }[] };
+  platforms: string[];
   features: { title: string; items: { t: string; b: string }[] };
   how: { title: string; steps: { t: string; b: string }[]; cta: string };
   free: { title: string; sub: string; bullets: string[] };
@@ -17,6 +27,15 @@ type Copy = {
   cta: { title: string; sub: string; button: string };
   footer: { tagline: string };
 };
+
+const FEATURE_ICONS = [
+  SquaresFour,
+  Quotes,
+  ListChecks,
+  MagicWand,
+  DownloadSimple,
+  Gift,
+];
 
 const COPY: Record<"en" | "zh", Copy> = {
   en: {
@@ -37,7 +56,17 @@ const COPY: Record<"en" | "zh", Copy> = {
       band: "Band 3/5",
       quote: "I grew from 0 to 10k followers in 3 months…",
       suggestion: "Lead with the outcome before the backstory.",
+      evidence: "Evidence from your copy",
+      dims: [
+        { t: "Hook", v: 64 },
+        { t: "Title", v: 72 },
+        { t: "Rhythm", v: 58 },
+        { t: "Emotion", v: 81 },
+        { t: "Social", v: 66 },
+        { t: "Reply", v: 54 },
+      ],
     },
+    platforms: ["Xiaohongshu", "WeChat", "LinkedIn", "X", "Blog"],
     features: {
       title: "Scoring you can trust, rewriting you can ship.",
       items: [
@@ -99,7 +128,17 @@ const COPY: Record<"en" | "zh", Copy> = {
       band: "档位 3/5",
       quote: "我用3个月把粉丝从0做到1万……",
       suggestion: "先给结论，再讲背景。",
+      evidence: "来自你原文的证据",
+      dims: [
+        { t: "钩子", v: 64 },
+        { t: "标题", v: 72 },
+        { t: "节奏", v: 58 },
+        { t: "情绪", v: 81 },
+        { t: "社交", v: 66 },
+        { t: "互动", v: 54 },
+      ],
     },
+    platforms: ["小红书", "公众号", "LinkedIn", "X", "博客"],
     features: {
       title: "可信的评分，能用的改写。",
       items: [
@@ -172,7 +211,20 @@ export default function Landing() {
       </header>
 
       <section id="top" className="relative overflow-hidden bg-gradient-to-b from-zinc-50 to-white">
-        <div className="mx-auto flex max-w-4xl flex-col items-center px-6 pt-20 text-center sm:pt-24">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(9,9,11,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(9,9,11,0.05) 1px, transparent 1px)",
+            backgroundSize: "56px 56px",
+            maskImage:
+              "radial-gradient(ellipse 75% 55% at 50% 0%, #000 25%, transparent 75%)",
+            WebkitMaskImage:
+              "radial-gradient(ellipse 75% 55% at 50% 0%, #000 25%, transparent 75%)",
+          }}
+        />
+        <div className="relative mx-auto flex max-w-4xl flex-col items-center px-6 pt-20 text-center sm:pt-24">
           <Reveal className="flex flex-col items-center">
             <span className="rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-[13px] font-medium tracking-wide text-zinc-500">
               {c.hero.badge}
@@ -191,27 +243,79 @@ export default function Landing() {
                 {c.hero.more}
               </a>
             </div>
+            <ul className="mt-8 flex flex-wrap items-center justify-center gap-2">
+              {c.platforms.map((p) => (
+                <li
+                  key={p}
+                  className="rounded-full border border-zinc-200 bg-white/70 px-3 py-1 text-xs text-zinc-500"
+                >
+                  {p}
+                </li>
+              ))}
+            </ul>
           </Reveal>
         </div>
 
-        <div className="mx-auto mt-16 w-full max-w-5xl px-6 pb-24">
-          <div className="relative mx-auto max-w-3xl rounded-[28px] border border-zinc-200/80 bg-white p-8 shadow-[0_40px_80px_-40px_rgba(0,0,0,0.3)]">
-            <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
-              <p className="text-sm font-medium">{c.mock.title}</p>
-              <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs text-zinc-500">{c.mock.platform}</span>
-            </div>
-            <div className="mt-5 grid gap-5 sm:grid-cols-2">
-              <div className="rounded-2xl bg-zinc-900 p-5 text-white">
-                <p className="text-xs text-zinc-400">{c.mock.overall}</p>
-                <p className="mt-1 text-3xl font-semibold">78/100</p>
+        <div className="relative mx-auto mt-14 w-full max-w-5xl px-6 pb-24">
+          <Reveal delay={0.08}>
+            <div className="relative mx-auto max-w-3xl overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-[0_40px_80px_-40px_rgba(24,24,27,0.35)]">
+              <div className="flex items-center gap-2 border-b border-zinc-100 bg-zinc-50/80 px-5 py-3">
+                <span className="h-2.5 w-2.5 rounded-full bg-zinc-200" />
+                <span className="h-2.5 w-2.5 rounded-full bg-zinc-200" />
+                <span className="h-2.5 w-2.5 rounded-full bg-zinc-200" />
+                <span className="ml-3 text-xs text-zinc-400">NotesBang Studio</span>
               </div>
-              <div className="rounded-2xl bg-zinc-50 p-5">
-                <p className="text-xs text-zinc-400">{c.mock.dim} · {c.mock.band}</p>
-                <p className="mt-2 text-sm text-zinc-600">“{c.mock.quote}”</p>
-                <p className="mt-2 text-xs text-zinc-500">→ {c.mock.suggestion}</p>
+              <div className="p-6 sm:p-8">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm font-medium text-zinc-900">{c.mock.title}</p>
+                  <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs text-zinc-500">
+                    {c.mock.platform}
+                  </span>
+                </div>
+
+                <div className="mt-6 grid items-center gap-6 sm:grid-cols-[minmax(0,300px)_minmax(0,1fr)]">
+                  <RadarChart
+                    axes={c.mock.dims.map((d) => d.t)}
+                    series={[
+                      {
+                        label: c.mock.overall,
+                        color: "#18181b",
+                        values: c.mock.dims.map((d) => d.v),
+                      },
+                    ]}
+                  />
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-end justify-between rounded-2xl bg-zinc-900 px-5 py-4 text-white">
+                      <span className="text-xs text-zinc-400">{c.mock.overall}</span>
+                      <span className="tnum text-3xl font-semibold">78/100</span>
+                    </div>
+                    <ul className="flex flex-col gap-3">
+                      {c.mock.dims.map((d) => (
+                        <li key={d.t}>
+                          <div className="flex items-center justify-between text-xs text-zinc-500">
+                            <span>{d.t}</span>
+                            <span className="tnum text-zinc-400">{d.v}</span>
+                          </div>
+                          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+                            <div
+                              className="h-full rounded-full bg-zinc-800"
+                              style={{ width: `${d.v}%` }}
+                            />
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-2xl border border-zinc-100 bg-zinc-50/70 px-5 py-4">
+                  <p className="text-xs font-medium text-zinc-400">{c.mock.evidence}</p>
+                  <p className="mt-1.5 text-sm text-zinc-600">“{c.mock.quote}”</p>
+                  <p className="mt-2 text-sm text-zinc-900">→ {c.mock.suggestion}</p>
+                </div>
               </div>
             </div>
-          </div>
+          </Reveal>
         </div>
       </section>
 
@@ -219,12 +323,18 @@ export default function Landing() {
         <div className="mx-auto max-w-6xl px-6">
           <h2 className="mx-auto max-w-2xl text-center text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{c.features.title}</h2>
           <div className="mt-14 grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
-            {c.features.items.map((f, i) => (
-              <Reveal key={f.t} delay={i * 0.06}>
-                <h3 className="text-lg font-semibold tracking-tight">{f.t}</h3>
-                <p className="mt-2 text-[15px] leading-relaxed text-zinc-500">{f.b}</p>
-              </Reveal>
-            ))}
+            {c.features.items.map((f, i) => {
+              const Icon = FEATURE_ICONS[i % FEATURE_ICONS.length];
+              return (
+                <Reveal key={f.t} delay={i * 0.06}>
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-200/80 bg-zinc-50 text-zinc-900">
+                    <Icon size={22} weight="duotone" />
+                  </span>
+                  <h3 className="mt-4 text-lg font-semibold tracking-tight">{f.t}</h3>
+                  <p className="mt-2 text-[15px] leading-relaxed text-zinc-500">{f.b}</p>
+                </Reveal>
+              );
+            })}
           </div>
         </div>
       </section>
