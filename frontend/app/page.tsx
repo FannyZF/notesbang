@@ -19,7 +19,7 @@ type Copy = {
 
 const COPY: Record<"en" | "zh", Copy> = {
   en: {
-    nav: { features: "Features", how: "How it works", faq: "FAQ", open: "Open Studio" },
+    nav: { features: "Features", how: "How it works", faq: "FAQ", open: "Start free" },
     hero: {
       badge: "Content scoring & rewriting, made for your platform",
       title1: "Paste your copy.",
@@ -55,7 +55,7 @@ const COPY: Record<"en" | "zh", Copy> = {
         { t: "Get your scorecard", b: "See band-by-band scores with evidence and concrete fixes." },
         { t: "Rewrite & export", b: "Apply a full rewrite with title and hook options, then export." },
       ],
-      cta: "Score your first piece",
+      cta: "Start free",
     },
     free: {
       title: "Free during early access.",
@@ -77,11 +77,11 @@ const COPY: Record<"en" | "zh", Copy> = {
         { q: "Is it really free?", a: `Yes, during early access: ${FREE_DAILY_LIMIT} analyses per day per account, no card required.` },
       ],
     },
-    cta: { title: "Your next piece deserves a second pair of eyes.", sub: "Score it free, see the reasons, ship a better version.", button: "Open Studio" },
+    cta: { title: "Your next piece deserves a second pair of eyes.", sub: "Score it free, see the reasons, ship a better version.", button: "Start free" },
     footer: { tagline: "NotesBang · content scoring & rewriting" },
   },
   zh: {
-    nav: { features: "功能", how: "流程", faq: "常见问题", open: "打开工作台" },
+    nav: { features: "功能", how: "流程", faq: "常见问题", open: "免费开始" },
     hero: {
       badge: "为你的发布平台而做的文案评分与改写",
       title1: "粘贴你的文案。",
@@ -117,7 +117,7 @@ const COPY: Record<"en" | "zh", Copy> = {
         { t: "拿到评分卡", b: "逐维度查看档位、原文证据与具体修改建议。" },
         { t: "改写与导出", b: "应用整篇改写（含标题/开头备选），然后导出。" },
       ],
-      cta: "分析你的第一篇文案",
+      cta: "免费开始",
     },
     free: {
       title: "早期体验期，完全免费。",
@@ -139,7 +139,7 @@ const COPY: Record<"en" | "zh", Copy> = {
         { q: "真的免费吗？", a: `早期体验期免费：每账号每天 ${FREE_DAILY_LIMIT} 次分析，无需绑卡。` },
       ],
     },
-    cta: { title: "你的下一篇文案，值得再被看一遍。", sub: "免费评分，看清理由，交付更好的版本。", button: "打开工作台" },
+    cta: { title: "你的下一篇文案，值得再被看一遍。", sub: "免费评分，看清理由，交付更好的版本。", button: "免费开始" },
     footer: { tagline: "NotesBang · 文案评分与改写" },
   },
 };
@@ -149,7 +149,7 @@ export default function Landing() {
   const c = COPY[locale] ?? COPY.en;
 
   return (
-    <main className="min-h-full bg-white font-sans text-zinc-900 antialiased">
+    <main id="main" className="min-h-full bg-white font-sans text-zinc-900 antialiased">
       <header className="sticky top-0 z-20 border-b border-black/5 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-6">
           <a href="#top" className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
@@ -163,7 +163,7 @@ export default function Landing() {
           </nav>
           <div className="flex items-center gap-3">
             <LanguageSwitcher />
-            <Link href="/studio" className="rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-zinc-700">
+            <Link href="/studio" className="rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-zinc-700 active:scale-[0.98]">
               {c.nav.open}
             </Link>
           </div>
@@ -171,7 +171,7 @@ export default function Landing() {
       </header>
 
       <section id="top" className="relative overflow-hidden bg-gradient-to-b from-zinc-50 to-white">
-        <div className="mx-auto flex max-w-4xl flex-col items-center px-6 pt-24 text-center sm:pt-32">
+        <div className="mx-auto flex max-w-4xl flex-col items-center px-6 pt-20 text-center sm:pt-24">
           <span className="rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-[13px] font-medium tracking-wide text-zinc-500">
             {c.hero.badge}
           </span>
@@ -182,10 +182,10 @@ export default function Landing() {
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-zinc-500">{c.hero.sub}</p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/studio" className="rounded-full bg-zinc-900 px-7 py-3 text-[15px] font-medium text-white shadow-sm transition hover:bg-zinc-700">
+            <Link href="/studio" className="rounded-full bg-zinc-900 px-7 py-3 text-[15px] font-medium text-white shadow-sm transition hover:bg-zinc-700 active:scale-[0.98]">
               {c.hero.cta}
             </Link>
-            <a href="#how" className="rounded-full border border-zinc-300 bg-white px-7 py-3 text-[15px] font-medium text-zinc-700 transition hover:bg-zinc-50">
+            <a href="#how" className="rounded-full border border-zinc-300 bg-white px-7 py-3 text-[15px] font-medium text-zinc-700 transition hover:bg-zinc-50 active:scale-[0.98]">
               {c.hero.more}
             </a>
           </div>
@@ -239,7 +239,7 @@ export default function Landing() {
             ))}
           </div>
           <div className="mt-12 text-center">
-            <Link href="/studio" className="inline-flex items-center justify-center rounded-full bg-zinc-900 px-7 py-3 text-[15px] font-medium text-white transition hover:bg-zinc-700">
+            <Link href="/studio" className="inline-flex items-center justify-center rounded-full bg-zinc-900 px-7 py-3 text-[15px] font-medium text-white transition hover:bg-zinc-700 active:scale-[0.98]">
               {c.how.cta}
             </Link>
           </div>
@@ -258,7 +258,7 @@ export default function Landing() {
               </li>
             ))}
           </ul>
-          <Link href="/studio" className="mt-8 inline-flex items-center justify-center rounded-full bg-zinc-900 px-7 py-3 text-[15px] font-medium text-white transition hover:bg-zinc-700">
+          <Link href="/studio" className="mt-8 inline-flex items-center justify-center rounded-full bg-zinc-900 px-7 py-3 text-[15px] font-medium text-white transition hover:bg-zinc-700 active:scale-[0.98]">
             {c.nav.open}
           </Link>
         </div>
@@ -284,7 +284,7 @@ export default function Landing() {
       <section className="bg-zinc-950 py-20 text-center text-white">
         <h2 className="mx-auto max-w-2xl px-6 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{c.cta.title}</h2>
         <p className="mx-auto mt-4 max-w-xl px-6 text-zinc-400">{c.cta.sub}</p>
-        <Link href="/studio" className="mt-8 inline-flex items-center justify-center rounded-full bg-white px-7 py-3 text-[15px] font-medium text-zinc-900 transition hover:bg-zinc-200">
+        <Link href="/studio" className="mt-8 inline-flex items-center justify-center rounded-full bg-white px-7 py-3 text-[15px] font-medium text-zinc-900 transition hover:bg-zinc-200 active:scale-[0.98]">
           {c.cta.button}
         </Link>
       </section>

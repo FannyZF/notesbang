@@ -40,7 +40,7 @@ export default function VerifyPage() {
   const failed = state === "error" || state === "missing";
 
   return (
-    <main className="flex min-h-screen flex-col bg-white font-sans text-zinc-900 antialiased">
+    <main id="main" className="flex min-h-[100dvh] flex-col bg-white font-sans text-zinc-900 antialiased">
       <header className="border-b border-black/5">
         <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between px-6">
           <Link href="/" className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">

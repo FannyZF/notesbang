@@ -31,7 +31,7 @@ export default function TermsPage() {
   const { locale, t } = useI18n();
   const sections = SECTIONS[locale] ?? SECTIONS.en;
   return (
-    <main className="min-h-full bg-white font-sans text-zinc-900 antialiased">
+    <main id="main" className="min-h-full bg-white font-sans text-zinc-900 antialiased">
       <header className="sticky top-0 z-20 border-b border-black/5 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between px-6">
           <a href="/" className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">

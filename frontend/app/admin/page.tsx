@@ -288,7 +288,7 @@ export default function AdminPage() {
   );
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-6 px-6 py-10 font-sans text-zinc-900">
+    <main id="main" className="mx-auto flex min-h-[100dvh] w-full max-w-5xl flex-col gap-6 px-6 py-10 font-sans text-zinc-900">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs font-medium uppercase tracking-widest text-zinc-400">Admin console</p>
