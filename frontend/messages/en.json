@@ -15,6 +15,12 @@
     "save": "Save",
     "open": "Open"
   },
+  "notfound": {
+    "title": "Page not found",
+    "body": "The page you're looking for doesn't exist or has moved.",
+    "home": "Back to home",
+    "studio": "Open Studio"
+  },
   "auth": {
     "welcome_back": "Welcome back",
     "welcome_back_sub": "Sign in to score and rewrite your copy.",
@@ -78,6 +84,7 @@
     "revised": "Revised copy",
     "history": "History",
     "no_docs": "No documents yet.",
+    "no_docs_hint": "Paste your copy above, pick the platform you publish on, then hit Analyze. Your scorecard shows up here.",
     "export_md": "Export .md",
     "export_docx": "Export .docx",
     "export_txt": "Export .txt",

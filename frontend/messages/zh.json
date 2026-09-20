@@ -15,6 +15,12 @@
     "save": "保存",
     "open": "打开"
   },
+  "notfound": {
+    "title": "页面不存在",
+    "body": "你访问的页面不存在或已移动。",
+    "home": "返回首页",
+    "studio": "打开工作台"
+  },
   "auth": {
     "welcome_back": "欢迎回来",
     "welcome_back_sub": "登录后即可为你的文案评分与改写。",
@@ -78,6 +84,7 @@
     "revised": "改写稿",
     "history": "历史记录",
     "no_docs": "还没有文档。",
+    "no_docs_hint": "在上方粘贴你的文案，选择要发布的平台，然后点「分析」。评分卡会出现在这里。",
     "export_md": "导出 .md",
     "export_docx": "导出 .docx",
     "export_txt": "导出 .txt",

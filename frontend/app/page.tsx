@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import Reveal from "../components/Reveal";
 import { FREE_DAILY_LIMIT } from "../lib/config";
 import { useI18n } from "../lib/i18n";
 
@@ -23,8 +24,8 @@ const COPY: Record<"en" | "zh", Copy> = {
     hero: {
       badge: "Content scoring & rewriting, made for your platform",
       title1: "Paste your copy.",
-      title2: "See exactly why it works — or doesn't.",
-      sub: "Score your article or note across hook, rhythm, emotion, social currency and more, with evidence from your own text. Then rewrite it — full version plus title and opening options.",
+      title2: "See exactly why it works, or why it doesn't.",
+      sub: "Score your article or note across hook, rhythm, emotion, social currency and more, with evidence from your own text. Then rewrite it: full version plus title and opening options.",
       cta: "Start free →",
       more: "See how it works",
     },
@@ -41,7 +42,7 @@ const COPY: Record<"en" | "zh", Copy> = {
       title: "Scoring you can trust, rewriting you can ship.",
       items: [
         { t: "Platform rubrics", b: "Xiaohongshu, WeChat, LinkedIn, X and Blog each get their own weights and norms." },
-        { t: "Evidence-based scores", b: "Every score cites exact lines from your copy, so you see the reason — not just a number." },
+        { t: "Evidence-based scores", b: "Every score cites exact lines from your copy, so you see the reason, not just a number." },
         { t: "Actionable suggestions", b: "Issue → fix → a ready-to-paste example for each dimension." },
         { t: "Full rewrite + variants", b: "Get a rewritten piece plus 5 titles and 3 opening hooks." },
         { t: "Export anywhere", b: "Download the scorecard and rewrite as Markdown, Word or plain text." },
@@ -59,21 +60,21 @@ const COPY: Record<"en" | "zh", Copy> = {
     },
     free: {
       title: "Free during early access.",
-      sub: "Help us learn what makes copy work — and get your analysis free.",
+      sub: "Help us learn what makes copy work, and get your analysis free.",
       bullets: [
         `${FREE_DAILY_LIMIT} analyses per day, up to 3000 characters each`,
         "No credit card required",
-        "Your copy is used (anonymized) to improve the service — you can opt out anytime",
+        "Your copy is used (anonymized) to improve the service. You can opt out anytime",
       ],
     },
     faq: {
       title: "Frequently asked questions",
       items: [
         { q: "Which formats can I upload?", a: "Paste plain text, or upload .docx, .txt or .md. Each piece is capped at 3000 characters to keep scoring fast and free." },
-        { q: "How is the score computed?", a: "Each dimension is rated on a 1–5 band using a platform-specific rubric, and the overall score is the weighted average computed by our system — not guessed by the model." },
+        { q: "How is the score computed?", a: "Each dimension is rated on a 1–5 band using a platform-specific rubric, and the overall score is the weighted average computed by our system, not guessed by the model." },
         { q: "Is there an 'AI probability' score?", a: "No. AI-text detection is unreliable, so we removed it. Instead we score things you can act on: hook, title, rhythm, emotion, social currency and interaction." },
         { q: "Will you use my copy?", a: "By default your anonymized copy helps us learn what works; you can turn this off per document or any time. See the Privacy Policy." },
-        { q: "Does it work in Chinese and English?", a: "Yes — the UI and the scoring support both, and the output follows your copy's language." },
+        { q: "Does it work in Chinese and English?", a: "Yes. The UI and the scoring support both, and the output follows your copy's language." },
         { q: "Is it really free?", a: `Yes, during early access: ${FREE_DAILY_LIMIT} analyses per day per account, no card required.` },
       ],
     },
@@ -172,23 +173,25 @@ export default function Landing() {
 
       <section id="top" className="relative overflow-hidden bg-gradient-to-b from-zinc-50 to-white">
         <div className="mx-auto flex max-w-4xl flex-col items-center px-6 pt-20 text-center sm:pt-24">
-          <span className="rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-[13px] font-medium tracking-wide text-zinc-500">
-            {c.hero.badge}
-          </span>
-          <h1 className="mt-6 max-w-3xl text-4xl font-semibold leading-tight tracking-tight text-balance sm:text-6xl sm:leading-[1.05]">
-            {c.hero.title1}
-            <br />
-            {c.hero.title2}
-          </h1>
-          <p className="mt-6 max-w-2xl text-lg leading-relaxed text-zinc-500">{c.hero.sub}</p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/studio" className="rounded-full bg-zinc-900 px-7 py-3 text-[15px] font-medium text-white shadow-sm transition hover:bg-zinc-700 active:scale-[0.98]">
-              {c.hero.cta}
-            </Link>
-            <a href="#how" className="rounded-full border border-zinc-300 bg-white px-7 py-3 text-[15px] font-medium text-zinc-700 transition hover:bg-zinc-50 active:scale-[0.98]">
-              {c.hero.more}
-            </a>
-          </div>
+          <Reveal className="flex flex-col items-center">
+            <span className="rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-[13px] font-medium tracking-wide text-zinc-500">
+              {c.hero.badge}
+            </span>
+            <h1 className="mt-6 max-w-3xl text-4xl font-semibold leading-tight tracking-tight text-balance sm:text-6xl sm:leading-[1.05]">
+              {c.hero.title1}
+              <br />
+              {c.hero.title2}
+            </h1>
+            <p className="mt-6 max-w-2xl text-lg leading-relaxed text-zinc-500">{c.hero.sub}</p>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <Link href="/studio" className="rounded-full bg-zinc-900 px-7 py-3 text-[15px] font-medium text-white shadow-sm transition hover:bg-zinc-700 active:scale-[0.98]">
+                {c.hero.cta}
+              </Link>
+              <a href="#how" className="rounded-full border border-zinc-300 bg-white px-7 py-3 text-[15px] font-medium text-zinc-700 transition hover:bg-zinc-50 active:scale-[0.98]">
+                {c.hero.more}
+              </a>
+            </div>
+          </Reveal>
         </div>
 
         <div className="mx-auto mt-16 w-full max-w-5xl px-6 pb-24">
@@ -216,11 +219,11 @@ export default function Landing() {
         <div className="mx-auto max-w-6xl px-6">
           <h2 className="mx-auto max-w-2xl text-center text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{c.features.title}</h2>
           <div className="mt-14 grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
-            {c.features.items.map((f) => (
-              <div key={f.t}>
+            {c.features.items.map((f, i) => (
+              <Reveal key={f.t} delay={i * 0.06}>
                 <h3 className="text-lg font-semibold tracking-tight">{f.t}</h3>
                 <p className="mt-2 text-[15px] leading-relaxed text-zinc-500">{f.b}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -231,11 +234,15 @@ export default function Landing() {
           <h2 className="mx-auto max-w-2xl text-center text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{c.how.title}</h2>
           <div className="mt-14 grid gap-6 md:grid-cols-3">
             {c.how.steps.map((s, i) => (
-              <div key={s.t} className="rounded-3xl border border-black/5 bg-white p-7 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
+              <Reveal
+                key={s.t}
+                delay={i * 0.08}
+                className="rounded-3xl border border-black/5 bg-white p-7 transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+              >
                 <p className="font-mono text-2xl font-semibold text-zinc-200">{String(i + 1).padStart(2, "0")}</p>
                 <h3 className="mt-4 text-xl font-semibold tracking-tight">{s.t}</h3>
                 <p className="mt-3 text-[15px] leading-relaxed text-zinc-500">{s.b}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
           <div className="mt-12 text-center">

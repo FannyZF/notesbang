@@ -625,7 +625,7 @@ export default function StudioPage() {
             <section className="rounded-3xl border border-zinc-200/80 bg-white p-6">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium text-zinc-700">{stageLabel(jobPhase)}</span>
-                <span className="text-zinc-400">{jobProgress}%</span>
+                <span className="text-zinc-400 tnum">{jobProgress}%</span>
               </div>
               <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-zinc-100">
                 <div
@@ -660,12 +660,35 @@ export default function StudioPage() {
             </section>
           )}
 
+          {/* Skeleton while the committee runs */}
+          {busy && !card && (
+            <section
+              aria-hidden
+              className="rounded-3xl border border-zinc-200/80 bg-white p-5 sm:p-6"
+            >
+              <div className="flex items-center justify-between">
+                <div className="h-5 w-32 animate-pulse rounded-full bg-zinc-100" />
+                <div className="h-7 w-28 animate-pulse rounded-full bg-zinc-100" />
+              </div>
+              <div className="mt-5 grid gap-4 lg:grid-cols-3">
+                <div className="h-40 animate-pulse rounded-2xl bg-zinc-50" />
+                <div className="h-40 animate-pulse rounded-2xl bg-zinc-50" />
+                <div className="h-40 animate-pulse rounded-2xl bg-zinc-50" />
+              </div>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="h-24 animate-pulse rounded-2xl bg-zinc-50" />
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Scorecard */}
           {card && (
             <section className="rounded-3xl border border-zinc-200/80 bg-white p-5 sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold">{t("studio.scorecard")}</h2>
-                <span className="rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-medium text-white">
+                <span className="rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-medium text-white tnum">
                   {t("studio.overall")}: {card.overall_score}/100
                 </span>
               </div>
@@ -972,7 +995,14 @@ export default function StudioPage() {
           {/* History */}
           <section className="rounded-3xl border border-zinc-200/80 bg-white p-6">
             <h2 className="text-lg font-semibold">{t("studio.history")}</h2>
-            {docs.length === 0 && <p className="mt-2 text-sm text-zinc-400">{t("studio.no_docs")}</p>}
+            {docs.length === 0 && (
+              <div className="mt-3 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/60 px-5 py-8 text-center">
+                <p className="text-sm font-medium text-zinc-600">{t("studio.no_docs")}</p>
+                <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-zinc-400">
+                  {t("studio.no_docs_hint")}
+                </p>
+              </div>
+            )}
             <div className="mt-3 flex flex-col gap-2">
               {docs.map((d) => (
                 <div
