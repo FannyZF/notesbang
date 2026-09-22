@@ -116,6 +116,10 @@ export default function StudioPage() {
   const [adopt, setAdopt] = useState<string[]>([]);
   const [quota, setQuota] = useState<{ limit: number; used: number; remaining: number } | null>(null);
   const [quotaOpen, setQuotaOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareIncludeContent, setShareIncludeContent] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
 
   const req = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -149,6 +153,11 @@ export default function StudioPage() {
     const stored = typeof window !== "undefined" ? window.localStorage.getItem("nb_token") : null;
     if (stored) setToken(stored);
   }, []);
+
+  // A share link belongs to one document's latest analysis; drop it on switch.
+  useEffect(() => {
+    setShareUrl(null);
+  }, [current?.id]);
 
   const refreshDocs = useCallback(async () => {
     if (!token) return;
@@ -304,6 +313,49 @@ export default function StudioPage() {
     }
   };
 
+  const createShare = async (includeContent: boolean) => {
+    if (!current) return;
+    setSharing(true);
+    setNotice(null);
+    try {
+      const r = (await req(`/documents/${current.id}/share`, {
+        method: "POST",
+        body: JSON.stringify({ include_content: includeContent }),
+      })) as { url: string };
+      setShareUrl(r.url);
+      setShareIncludeContent(includeContent);
+      setShareCopied(false);
+    } catch (err) {
+      setNotice({ kind: "err", text: errMessage(err) });
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const stopShare = async () => {
+    if (!current) return;
+    setSharing(true);
+    try {
+      await req(`/documents/${current.id}/share`, { method: "DELETE" });
+      setShareUrl(null);
+    } catch (err) {
+      setNotice({ kind: "err", text: errMessage(err) });
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const copyShareUrl = async () => {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      /* clipboard may be blocked; the input stays selectable */
+    }
+  };
+
   const stageLabel = (phase: string) => {
     if (/read/i.test(phase)) return t("studio.stage_reading");
     if (/committee/i.test(phase)) return t("studio.stage_committee");
@@ -322,6 +374,7 @@ export default function StudioPage() {
     setNotice(null);
     setCard(null);
     setRewrite(null);
+    setShareUrl(null);
     setJobPhase(t("studio.stage_reading"));
     setJobProgress(2);
     try {
@@ -726,10 +779,67 @@ export default function StudioPage() {
             <section className="rounded-3xl border border-zinc-200/80 bg-white p-5 sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold">{t("studio.scorecard")}</h2>
-                <span className="rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-medium text-white tnum">
-                  {t("studio.overall")}: {card.overall_score}/100
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-medium text-white tnum">
+                    {t("studio.overall")}: {card.overall_score}/100
+                  </span>
+                  {!shareUrl ? (
+                    <button
+                      onClick={() => void createShare(false)}
+                      disabled={sharing}
+                      className="rounded-full border border-zinc-300 px-4 py-1.5 text-sm text-zinc-700 transition hover:bg-zinc-50 active:scale-[0.98] disabled:opacity-50"
+                    >
+                      {t("studio.share")}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => void stopShare()}
+                      disabled={sharing}
+                      className="rounded-full border border-zinc-200 px-4 py-1.5 text-sm text-zinc-500 transition hover:bg-zinc-50 disabled:opacity-50"
+                    >
+                      {t("studio.share_stop")}
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {shareUrl && (
+                <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50/70 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      readOnly
+                      value={shareUrl}
+                      onFocus={(e) => e.currentTarget.select()}
+                      className="min-w-56 flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-600"
+                    />
+                    <button
+                      onClick={() => void copyShareUrl()}
+                      className="rounded-full bg-zinc-900 px-4 py-2 text-xs font-medium text-white transition hover:bg-zinc-700 active:scale-[0.98]"
+                    >
+                      {shareCopied ? t("studio.share_copied") : t("studio.share_copy")}
+                    </button>
+                    <a
+                      href={shareUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-full border border-zinc-200 px-4 py-2 text-xs text-zinc-600 transition hover:bg-white"
+                    >
+                      {t("studio.share_open")}
+                    </a>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                    <label className="flex items-center gap-2 text-xs text-zinc-500">
+                      <input
+                        type="checkbox"
+                        checked={shareIncludeContent}
+                        onChange={(e) => void createShare(e.target.checked)}
+                      />
+                      {t("studio.share_include_content")}
+                    </label>
+                    <span className="text-[11px] text-zinc-400">{t("studio.share_hint")}</span>
+                  </div>
+                </div>
+              )}
 
               <div className="mt-4 grid gap-4 lg:grid-cols-3">
                 {/* Left: consensus strengths / weaknesses */}

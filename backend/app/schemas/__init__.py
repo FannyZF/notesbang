@@ -102,6 +102,10 @@ class DocumentPasteIn(BaseModel):
     consent_improve: bool = True
 
 
+class ShareIn(BaseModel):
+    include_content: bool = False
+
+
 class RewriteIn(BaseModel):
     kind: str = Field(default="full", pattern="^(full|title|hook|section)$")
     paragraph: str | None = None

@@ -343,3 +343,19 @@ class PageView(Base):
     )
     is_bot: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class Share(Base):
+    """Public, read-only link to one analysis (the user opts in to share)."""
+
+    __tablename__ = "shares"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token_digest: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    analysis_id: Mapped[int] = mapped_column(ForeignKey("analyses.id"), index=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), index=True)
+    include_content: Mapped[bool] = mapped_column(Boolean, default=False)
+    views: Mapped[int] = mapped_column(Integer, default=0)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)

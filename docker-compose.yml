@@ -112,6 +112,9 @@ services:
         # Relative base: the web app and /api share one origin via Caddy, so
         # the same image works on any domain/port without rebuilding.
         NEXT_PUBLIC_API_BASE: /api
+    environment:
+      # Server-side fetches (share page + its OG image) hit the API directly.
+      API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:8000/api}
     restart: unless-stopped
     depends_on:
       - api
