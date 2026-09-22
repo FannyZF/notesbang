@@ -52,6 +52,8 @@ services:
       SMTP_FROM: ${SMTP_FROM:-}
       ADMIN_TOKEN: ${ADMIN_TOKEN:-}
       TRACK_SALT: ${TRACK_SALT:-notesbang}
+      RUBRIC_VERSION: ${RUBRIC_VERSION:-v2}
+      AUDIT_LLM_ENABLED: ${AUDIT_LLM_ENABLED:-true}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       LLM_PROVIDER: ${LLM_PROVIDER:-mock}
       PUBLIC_WEB_URL: ${PUBLIC_ORIGIN:-http://localhost:8088}
@@ -81,6 +83,8 @@ services:
       TASK_BACKEND: celery
       STORAGE_BACKEND: local
       RENDER_SLIDES: "false"
+      RUBRIC_VERSION: ${RUBRIC_VERSION:-v2}
+      AUDIT_LLM_ENABLED: ${AUDIT_LLM_ENABLED:-true}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       LLM_PROVIDER: ${LLM_PROVIDER:-mock}
     depends_on:

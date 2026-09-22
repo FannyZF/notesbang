@@ -12,7 +12,7 @@ function point(index: number, total: number, value: number) {
   return [CENTER + r * Math.cos(angle), CENTER + r * Math.sin(angle)] as const;
 }
 
-function wrap(label: string, per = 5): string[] {
+function wrap(label: string, per = 6): string[] {
   if (label.length <= per) return [label];
   const lines: string[] = [];
   for (let i = 0; i < label.length; i += per) lines.push(label.slice(i, i + per));
@@ -55,7 +55,7 @@ export default function RadarChart({
         return (
           <g key={label}>
             <line x1={CENTER} y1={CENTER} x2={x} y2={y} stroke="#e4e4e7" strokeWidth={1} />
-            <text x={lx} y={ly} fontSize={10} fill="#52525b" textAnchor={anchor}>
+            <text x={lx} y={ly} fontSize={9.5} fill="#52525b" textAnchor={anchor}>
               {lines.map((line, li) => (
                 <tspan
                   key={li}

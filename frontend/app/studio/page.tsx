@@ -15,6 +15,20 @@ type Platform = {
   label: string;
   dimensions?: { key: string; label: string; definition?: string }[];
 };
+type Archetype = { key: string; label: string };
+type AuditResult = {
+  status?: string;
+  audit_results?: Record<string, string>;
+  audit_notes?: string;
+  issues?: { check?: string; quote?: string; note?: string }[];
+};
+type ChangelogEntry = {
+  change?: string;
+  why?: string;
+  original?: string;
+  revised?: string;
+  verified?: boolean;
+};
 type Evidence = { quote: string; location?: string; verified?: boolean };
 type Suggestion = { issue: string; fix: string; example: string; location?: string };
 type Viewpoint = { expert: string; label: string; rationale: string; band?: number; score?: number };
@@ -59,6 +73,7 @@ type Doc = {
   id: number;
   title: string;
   platform: string;
+  archetype?: string;
   char_count: number;
   language: string;
   consent_improve: boolean;
@@ -81,13 +96,19 @@ export default function StudioPage() {
 
   const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [platform, setPlatform] = useState("auto");
+  const [archetypes, setArchetypes] = useState<Archetype[]>([]);
+  const [archetype, setArchetype] = useState("auto");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [consent, setConsent] = useState(true);
   const [docs, setDocs] = useState<Doc[]>([]);
   const [current, setCurrent] = useState<Doc | null>(null);
   const [card, setCard] = useState<Scorecard | null>(null);
-  const [rewrite, setRewrite] = useState<{ kind: string; content: string; meta?: { diff?: DiffSegment[] } } | null>(null);
+  const [rewrite, setRewrite] = useState<{
+    kind: string;
+    content: string;
+    meta?: { diff?: DiffSegment[]; changelog?: ChangelogEntry[]; audit?: AuditResult | null };
+  } | null>(null);
   const [focus, setFocus] = useState<string[]>([]);
   const [showDiff, setShowDiff] = useState(false);
   const [jobPhase, setJobPhase] = useState("");
@@ -147,8 +168,13 @@ export default function StudioPage() {
           req(`/documents/platforms?lang=${locale}`),
           req("/documents/quota"),
           refreshDocs(),
-        ])) as [Platform[], { limit: number; used: number; remaining: number }, void];
-        setPlatforms(plats);
+        ])) as [
+          { platforms: Platform[]; archetypes: Archetype[] },
+          { limit: number; used: number; remaining: number },
+          void,
+        ];
+        setPlatforms(plats.platforms);
+        setArchetypes(plats.archetypes ?? []);
         setQuota(q);
       } catch (err) {
         setNotice({ kind: "err", text: errMessage(err) });
@@ -249,7 +275,7 @@ export default function StudioPage() {
     try {
       const doc = (await req("/documents", {
         method: "POST",
-        body: JSON.stringify({ title, content, platform, consent_improve: consent }),
+        body: JSON.stringify({ title, content, platform, archetype, consent_improve: consent }),
       })) as Doc;
       setCurrent(doc);
       setCard(null);
@@ -266,7 +292,7 @@ export default function StudioPage() {
     fd.append("file", file);
     try {
       const doc = (await req(
-        `/documents/upload?platform=${platform}&consent=${consent}`,
+        `/documents/upload?platform=${platform}&archetype=${archetype}&consent=${consent}`,
         { method: "POST", body: fd }
       )) as Doc;
       setCurrent(doc);
@@ -300,7 +326,7 @@ export default function StudioPage() {
     setJobProgress(2);
     try {
       const start = (await req(
-        `/documents/${current.id}/analyze?lang=${locale}&focus=${focus.join(",")}`,
+        `/documents/${current.id}/analyze?lang=${locale}&focus=${focus.join(",")}&archetype=${archetype}`,
         { method: "POST" }
       )) as { job_id: number };
       const deadline = Date.now() + 5 * 60 * 1000;
@@ -560,6 +586,18 @@ export default function StudioPage() {
                   <option key={p.key} value={p.key}>{p.label}</option>
                 ))}
               </select>
+              {archetypes.length > 0 && (
+                <select
+                  className="rounded-xl border border-zinc-200 px-3 py-2 text-sm text-zinc-600"
+                  value={archetype}
+                  onChange={(e) => setArchetype(e.target.value)}
+                  title={t("studio.archetype")}
+                >
+                  {archetypes.map((a) => (
+                    <option key={a.key} value={a.key}>{a.label}</option>
+                  ))}
+                </select>
+              )}
               <input className="min-w-48 flex-1 rounded-xl border border-zinc-200 px-3 py-2 text-sm" placeholder={t("studio.title_placeholder")} value={title} onChange={(e) => setTitle(e.target.value)} />
               <label className="cursor-pointer rounded-full border border-zinc-200 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50">
                 {t("studio.upload")}
@@ -987,6 +1025,73 @@ export default function StudioPage() {
                       {formatRewrite(rewrite)}
                     </pre>
                   )}
+
+                  {rewrite.kind === "full" && rewrite.meta?.audit && (
+                    <div
+                      className={`mt-3 rounded-2xl border p-4 text-xs ${
+                        rewrite.meta.audit.status === "APPROVED"
+                          ? "border-emerald-200 bg-emerald-50/60"
+                          : "border-amber-200 bg-amber-50/60"
+                      }`}
+                    >
+                      <p className="font-medium text-zinc-700">
+                        {t("studio.audit")} ·{" "}
+                        <span
+                          className={
+                            rewrite.meta.audit.status === "APPROVED"
+                              ? "text-emerald-700"
+                              : "text-amber-700"
+                          }
+                        >
+                          {rewrite.meta.audit.status || "-"}
+                        </span>
+                      </p>
+                      <ul className="mt-2 grid gap-1 sm:grid-cols-2">
+                        {Object.entries(rewrite.meta.audit.audit_results ?? {}).map(([k, v]) => (
+                          <li key={k} className="flex items-center gap-2 text-zinc-600">
+                            <span className={v === "PASS" ? "text-emerald-600" : "text-amber-600"}>
+                              {v === "PASS" ? "✔" : "!"}
+                            </span>
+                            <span className="font-mono text-[11px]">{k}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      {rewrite.meta.audit.audit_notes && (
+                        <p className="mt-2 leading-relaxed text-zinc-600">
+                          {rewrite.meta.audit.audit_notes}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {rewrite.kind === "full" &&
+                    (rewrite.meta?.changelog?.length ?? 0) > 0 && (
+                      <details className="mt-3 rounded-2xl border border-zinc-200 p-4">
+                        <summary className="cursor-pointer text-xs font-medium text-zinc-400 transition hover:text-zinc-600">
+                          {t("studio.changelog")}
+                        </summary>
+                        <ul className="mt-2 flex flex-col gap-2">
+                          {rewrite.meta!.changelog!.map((c, i) => (
+                            <li key={i} className="rounded-xl border border-zinc-100 px-3 py-2 text-xs">
+                              <p className="text-zinc-700">
+                                {c.change}
+                                {c.verified === false && (
+                                  <span className="ml-2 text-amber-600">· {t("studio.unverified")}</span>
+                                )}
+                              </p>
+                              {c.why && <p className="mt-0.5 text-zinc-400">{c.why}</p>}
+                              {(c.original || c.revised) && (
+                                <p className="mt-1 text-zinc-500">
+                                  {c.original && <span className="line-through">{c.original}</span>}
+                                  {c.original && c.revised && <span className="mx-1">→</span>}
+                                  {c.revised && <span className="text-zinc-700">{c.revised}</span>}
+                                </p>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
                 </div>
               )}
             </section>

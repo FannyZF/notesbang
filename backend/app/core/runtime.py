@@ -33,6 +33,7 @@ EDITABLE_KEYS = frozenset(
         "smtp_use_tls",
         "app_base_url",
         "public_web_url",
+        "audit_llm_enabled",
     }
 )
 
@@ -107,6 +108,43 @@ def mask_secret(value: str) -> str:
     if len(value) <= 8:
         return "*" * len(value)
     return f"{value[:4]}{'*' * 8}{value[-4:]}"
+
+
+def rubric_weights_key() -> str:
+    return f"rubric_weights_{get_settings().rubric_version}"
+
+
+def rubric_weight_overrides(db: Session) -> dict:
+    """Admin overrides for per-platform dimension weights (may be empty).
+
+    Shape: ``{platform_key: {dimension_key: weight}}``.
+    """
+    import json
+
+    raw = get_setting(db, rubric_weights_key())
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except (TypeError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def set_rubric_weights(db: Session, weights: dict) -> None:
+    import json
+
+    set_setting(db, rubric_weights_key(), json.dumps(weights, ensure_ascii=False))
+
+
+def clear_rubric_weights(db: Session) -> None:
+    row = db.get(AppSetting, rubric_weights_key())
+    if row is not None:
+        db.delete(row)
+
+
+def audit_llm_enabled(db: Session) -> bool:
+    return _get_bool(db, "audit_llm_enabled", get_settings().audit_llm_enabled)
 
 
 def mail_config(db: Session) -> dict:

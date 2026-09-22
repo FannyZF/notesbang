@@ -48,6 +48,19 @@ class Expert:
 
 
 @dataclass
+class Archetype:
+    key: str
+    label_zh: str
+    label_en: str
+    norms_zh: str
+    norms_en: str
+    title_min: int
+    title_max: int
+    formatting_zh: str
+    formatting_en: str
+
+
+@dataclass
 class Rubric:
     version: str
     band_scores: dict
@@ -55,6 +68,7 @@ class Rubric:
     dimensions: list[Dimension]
     platforms: dict
     experts: list[Expert]
+    archetypes: dict
 
 
 @lru_cache
@@ -105,6 +119,20 @@ def load_rubric() -> Rubric:
             )
             for e in data.get("experts", [])
         ],
+        archetypes={
+            key: Archetype(
+                key=key,
+                label_zh=val["label"]["zh"],
+                label_en=val["label"]["en"],
+                norms_zh=val["norms"]["zh"],
+                norms_en=val["norms"]["en"],
+                title_min=int((val.get("title") or {}).get("min", 0)),
+                title_max=int((val.get("title") or {}).get("max", 80)),
+                formatting_zh=val["formatting"]["zh"],
+                formatting_en=val["formatting"]["en"],
+            )
+            for key, val in (data.get("archetypes") or {}).items()
+        },
     )
 
 
@@ -135,9 +163,29 @@ def clamp_score(band: int, value: int | None) -> int:
         return band_to_score(band)
 
 
-def weights_with_focus(platform_key: str, focus: list[str] | None) -> dict:
-    """Base platform weights; focused dimensions get a 1.5x boost (renormalized)."""
+def effective_weights(platform_key: str, overrides: dict | None = None) -> dict:
+    """Platform weights with optional admin overrides applied.
+
+    ``overrides`` maps dimension keys to weights; unknown keys are ignored and
+    the result is renormalized so it always sums to 1.0.
+    """
     weights = dict(get_platform(platform_key).weights)
+    if overrides:
+        for key, value in overrides.items():
+            if key in weights:
+                try:
+                    weights[key] = max(0.0, float(value))
+                except (TypeError, ValueError):
+                    continue
+    total = sum(weights.values()) or 1.0
+    return {k: round(v / total, 4) for k, v in weights.items()}
+
+
+def weights_with_focus(
+    platform_key: str, focus: list[str] | None, overrides: dict | None = None
+) -> dict:
+    """Effective platform weights; focused dimensions get a 1.5x boost."""
+    weights = effective_weights(platform_key, overrides)
     if focus:
         for key in focus:
             if key in weights:
@@ -180,3 +228,35 @@ def render_rubric_blocks(platform_key: str, lang: str) -> str:
 
 def weights_for(platform_key: str) -> dict:
     return get_platform(platform_key).weights
+
+
+def get_archetype(key: str) -> Archetype:
+    rubric = load_rubric()
+    return rubric.archetypes.get(key) or rubric.archetypes.get("auto") or Archetype(
+        key="auto",
+        label_zh="自动判断",
+        label_en="Auto-detect",
+        norms_zh="按内容体裁判断",
+        norms_en="Judge the content type yourself",
+        title_min=0,
+        title_max=80,
+        formatting_zh="遵循所选平台的规范",
+        formatting_en="Follow the selected platform's norms",
+    )
+
+
+def archetype_label(key: str, lang: str) -> str:
+    a = get_archetype(key)
+    return a.label_zh if lang.startswith("zh") else a.label_en
+
+
+def render_archetype_block(key: str, lang: str) -> str:
+    """One-line archetype guidance injected into scoring/rewrite prompts."""
+    zh = lang.startswith("zh")
+    a = get_archetype(key)
+    norms = a.norms_zh if zh else a.norms_en
+    formatting = a.formatting_zh if zh else a.formatting_en
+    label = a.label_zh if zh else a.label_en
+    if zh:
+        return f"【内容原型】{label}｜规范：{norms}｜排版：{formatting}"
+    return f"[Archetype] {label} | Norms: {norms} | Formatting: {formatting}"

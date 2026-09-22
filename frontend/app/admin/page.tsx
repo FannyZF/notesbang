@@ -52,7 +52,22 @@ type Settings = {
   smtp_use_tls: boolean;
   app_base_url: string;
   public_web_url: string;
+  audit_llm_enabled: boolean;
   warnings: { code: string; message: string }[];
+};
+type Rubric = {
+  version: string;
+  dimensions: { key: string; label_zh: string; label_en: string }[];
+  platforms: {
+    key: string;
+    label_zh: string;
+    label_en: string;
+    weights: Record<string, number>;
+    default_weights: Record<string, number>;
+    overridden: boolean;
+  }[];
+  archetypes: { key: string; label_zh: string; label_en: string }[];
+  experts: { key: string; label_zh: string; label_en: string; focus: string[] }[];
 };
 type SettingsForm = {
   llm_provider: string;
@@ -90,6 +105,9 @@ export default function AdminPage() {
   const [totals, setTotals] = useState<Totals | null>(null);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [rubric, setRubric] = useState<Rubric | null>(null);
+  const [weights, setWeights] = useState<Record<string, Record<string, number>>>({});
+  const [savingWeights, setSavingWeights] = useState(false);
   const [traffic, setTraffic] = useState<Traffic | null>(null);
   const [trafficDays, setTrafficDays] = useState(30);
   const [form, setForm] = useState<SettingsForm | null>(null);
@@ -110,11 +128,12 @@ export default function AdminPage() {
     setBusy(true);
     setError(null);
     try {
-      const [s, u, cfg, tr] = await Promise.all([
+      const [s, u, cfg, tr, rb] = await Promise.all([
         fetch(`${API_BASE}/admin/summary`, { headers }),
         fetch(`${API_BASE}/admin/users?limit=100`, { headers }),
         fetch(`${API_BASE}/admin/settings`, { headers }),
         fetch(`${API_BASE}/admin/traffic?days=${trafficDays}`, { headers }),
+        fetch(`${API_BASE}/admin/rubric`, { headers }),
       ]);
       if (!s.ok) throw new Error(`Summary ${s.status}: ${(await s.text()).slice(0, 160)}`);
       if (!u.ok) throw new Error(`Users ${u.status}: ${(await u.text()).slice(0, 160)}`);
@@ -123,6 +142,13 @@ export default function AdminPage() {
       setTotals(sData.totals);
       setUsers((await u.json()) as UserRow[]);
       if (tr.ok) setTraffic((await tr.json()) as Traffic);
+      if (rb.ok) {
+        const rbData = (await rb.json()) as Rubric;
+        setRubric(rbData);
+        setWeights(
+          Object.fromEntries(rbData.platforms.map((p) => [p.key, { ...p.weights }]))
+        );
+      }
       const cfgData = (await cfg.json()) as Settings;
       setSettings(cfgData);
       setForm({
@@ -222,6 +248,63 @@ export default function AdminPage() {
       setError(errMessage(err));
     } finally {
       setTesting(false);
+    }
+  };
+
+  const saveWeights = async () => {
+    setSavingWeights(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const r = await fetch(`${API_BASE}/admin/rubric/weights`, {
+        method: "PUT",
+        headers: { ...(headers ?? {}), "Content-Type": "application/json" },
+        body: JSON.stringify({ weights }),
+      });
+      if (!r.ok) throw new Error(`Weights ${r.status}: ${(await r.text()).slice(0, 200)}`);
+      setNotice("Rubric weights saved.");
+      await load();
+    } catch (err) {
+      setError(errMessage(err));
+    } finally {
+      setSavingWeights(false);
+    }
+  };
+
+  const resetWeights = async () => {
+    if (!window.confirm("恢复所有平台的默认权重？")) return;
+    setSavingWeights(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const r = await fetch(`${API_BASE}/admin/rubric/weights/reset`, {
+        method: "POST",
+        headers,
+      });
+      if (!r.ok) throw new Error(`Reset ${r.status}: ${(await r.text()).slice(0, 200)}`);
+      setNotice("Rubric weights reset to defaults.");
+      await load();
+    } catch (err) {
+      setError(errMessage(err));
+    } finally {
+      setSavingWeights(false);
+    }
+  };
+
+  const setAuditEnabled = async (enabled: boolean) => {
+    setError(null);
+    setNotice(null);
+    try {
+      const r = await fetch(`${API_BASE}/admin/settings`, {
+        method: "PUT",
+        headers: { ...(headers ?? {}), "Content-Type": "application/json" },
+        body: JSON.stringify({ audit_llm_enabled: enabled }),
+      });
+      if (!r.ok) throw new Error(`Audit toggle ${r.status}: ${(await r.text()).slice(0, 200)}`);
+      setNotice(enabled ? "Rewrite audit enabled." : "Rewrite audit disabled.");
+      await load();
+    } catch (err) {
+      setError(errMessage(err));
     }
   };
 
@@ -457,6 +540,92 @@ export default function AdminPage() {
             隐私友好统计：不使用 cookie，不保存明文 IP（仅按「IP+UA+月份」的哈希去重）；
             已过滤爬虫（{traffic.totals.bots} 次机器人访问未计入）。
           </p>
+        </section>
+      )}
+
+      {rubric && (
+        <section className="rounded-2xl border border-zinc-200/80 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-medium text-zinc-700">
+                Rubric weights <span className="font-normal text-zinc-400">(v{rubric.version})</span>
+              </h2>
+              <p className="mt-1 text-xs text-zinc-400">
+                维度权重按平台配置，保存后只影响之后的新分析。数值不必凑满 1，系统会自动归一化。
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 text-xs text-zinc-600">
+                <input
+                  type="checkbox"
+                  checked={settings?.audit_llm_enabled ?? true}
+                  onChange={(e) => void setAuditEnabled(e.target.checked)}
+                />
+                LLM 改写审计
+              </label>
+              <button
+                onClick={() => void resetWeights()}
+                disabled={savingWeights}
+                className="rounded-full border border-zinc-200 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
+              >
+                重置为默认
+              </button>
+              <button
+                onClick={() => void saveWeights()}
+                disabled={savingWeights}
+                className="rounded-full bg-zinc-900 px-5 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {savingWeights ? "Saving…" : "Save weights"}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="text-zinc-400">
+                <tr>
+                  <th className="px-2 py-2 font-medium">Platform</th>
+                  {rubric.dimensions.map((d) => (
+                    <th key={d.key} className="px-2 py-2 font-medium" title={d.key}>
+                      {d.label_en}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {rubric.platforms.map((p) => (
+                  <tr key={p.key}>
+                    <td className="whitespace-nowrap px-2 py-2 text-zinc-700">
+                      {p.label_en}
+                      {p.overridden && (
+                        <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] text-amber-700">
+                          edited
+                        </span>
+                      )}
+                    </td>
+                    {rubric.dimensions.map((d) => (
+                      <td key={d.key} className="px-1 py-1">
+                        <input
+                          type="number"
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          value={weights[p.key]?.[d.key] ?? 0}
+                          onChange={(e) =>
+                            setWeights((w) => ({
+                              ...w,
+                              [p.key]: { ...(w[p.key] ?? {}), [d.key]: Number(e.target.value) },
+                            }))
+                          }
+                          className="w-16 rounded-lg border border-zinc-200 px-2 py-1 text-xs text-zinc-700 tnum"
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
 

@@ -88,6 +88,7 @@ def ensure_schema() -> None:
         "users": {"banned": 0, "notify_on_complete": 1, "locale": "en"},
         "analyses": {"consensus_json": "{}"},
         "dimension_scores": {"spread": 0.0},
+        "documents": {"archetype": "auto"},
     }
     for table_name, columns in backfills.items():
         if not insp.has_table(table_name):

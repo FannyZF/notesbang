@@ -99,10 +99,16 @@ class Settings:
         # Content-scoring product knobs.
         self.content_max_chars = int(os.getenv("CONTENT_MAX_CHARS", "3000"))
         self.free_daily_limit = int(os.getenv("FREE_DAILY_LIMIT", "3"))
-        self.rubric_version = os.getenv("RUBRIC_VERSION", "v1")
+        self.rubric_version = os.getenv("RUBRIC_VERSION", "v2")
         self.scoring_cache_enabled = os.getenv(
             "SCORING_CACHE_ENABLED", "true"
         ).lower() in ("1", "true", "yes")
+        # LLM rewrite auditor (report-only; never rewrites the copy).
+        self.audit_llm_enabled = os.getenv("AUDIT_LLM_ENABLED", "true").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
         self.export_enabled = os.getenv("EXPORT_ENABLED", "false").lower() in (
             "1",
             "true",

@@ -61,7 +61,7 @@ def _cap(content: str) -> str:
 
 
 def _create(db: Session, user: User, *, title: str, content: str, fmt: str,
-            platform: str, consent: bool) -> Document:
+            platform: str, consent: bool, archetype: str = "auto") -> Document:
     content = _cap(content)
     lang = detect_language(content)
     doc = Document(
@@ -69,6 +69,7 @@ def _create(db: Session, user: User, *, title: str, content: str, fmt: str,
         title=(title or "").strip()[:300] or "Untitled",
         source_format=fmt,
         platform=platform or "auto",
+        archetype=archetype or "auto",
         content=content,
         char_count=content_length(content),
         language=lang,
@@ -96,6 +97,7 @@ def _doc_out(doc: Document) -> dict:
         "title": doc.title,
         "source_format": doc.source_format,
         "platform": doc.platform,
+        "archetype": getattr(doc, "archetype", "auto"),
         "char_count": doc.char_count,
         "language": doc.language,
         "consent_improve": doc.consent_improve,
@@ -114,6 +116,7 @@ def create_from_paste(
         db, user,
         title=payload.title, content=payload.content, fmt="paste",
         platform=payload.platform, consent=payload.consent_improve,
+        archetype=payload.archetype,
     )
     return _doc_out(doc)
 
@@ -122,6 +125,7 @@ def create_from_paste(
 async def create_from_file(
     file: UploadFile = File(...),
     platform: str = Query(default="auto"),
+    archetype: str = Query(default="auto"),
     consent: bool = Query(default=True),
     user: User = Depends(require_verified),
     db: Session = Depends(get_db),
@@ -146,7 +150,7 @@ async def create_from_file(
         ) from exc
     doc = _create(
         db, user, title=title, content=text, fmt=ext.lstrip("."),
-        platform=platform, consent=consent,
+        platform=platform, consent=consent, archetype=archetype,
     )
     return _doc_out(doc)
 
@@ -167,25 +171,38 @@ def list_documents(
 
 
 @router.get("/platforms")
-def list_platforms(lang: str = Query(default="en")):
+def list_platforms(
+    lang: str = Query(default="en"),
+    db: Session = Depends(get_db),
+):
+    from app.core import runtime
+    from app.content.rubric import effective_weights
+
     rubric = load_rubric()
     zh = lang.startswith("zh")
-    return [
-        {
-            "key": p.key,
-            "label": p.label_zh if zh else p.label_en,
-            "weights": p.weights,
-            "dimensions": [
-                {
-                    "key": d.key,
-                    "label": d.label_zh if zh else d.label_en,
-                    "definition": d.definition_zh if zh else d.definition_en,
-                }
-                for d in rubric.dimensions
-            ],
-        }
-        for p in rubric.platforms.values()
-    ]
+    overrides = runtime.rubric_weight_overrides(db)
+    return {
+        "platforms": [
+            {
+                "key": p.key,
+                "label": p.label_zh if zh else p.label_en,
+                "weights": effective_weights(p.key, overrides.get(p.key)),
+                "dimensions": [
+                    {
+                        "key": d.key,
+                        "label": d.label_zh if zh else d.label_en,
+                        "definition": d.definition_zh if zh else d.definition_en,
+                    }
+                    for d in rubric.dimensions
+                ],
+            }
+            for p in rubric.platforms.values()
+        ],
+        "archetypes": [
+            {"key": a.key, "label": a.label_zh if zh else a.label_en}
+            for a in rubric.archetypes.values()
+        ],
+    }
 
 
 @router.get("/quota")
@@ -372,6 +389,7 @@ def analyze_document(
     doc_id: int,
     lang: str = Query(default="en"),
     focus: str = Query(default=""),
+    archetype: str = Query(default=""),
     user: User = Depends(require_verified),
     db: Session = Depends(get_db),
 ):
@@ -379,13 +397,17 @@ def analyze_document(
     doc = _owned(db, doc_id, user)
     _quota_check(db, user)
     focus_keys = [k.strip() for k in focus.split(",") if k.strip()]
+    chosen_archetype = (archetype or "").strip() or getattr(doc, "archetype", "auto")
 
     job = Job(
         document_id=doc.id,
         type="analyze",
         status="queued",
         phase="Queued",
-        params_json=json.dumps({"focus": focus_keys, "lang": lang}, ensure_ascii=False),
+        params_json=json.dumps(
+            {"focus": focus_keys, "lang": lang, "archetype": chosen_archetype},
+            ensure_ascii=False,
+        ),
     )
     db.add(job)
     db.commit()
@@ -435,9 +457,11 @@ def rewrite_document(
     )
     provider = get_provider()
     out_lang = doc.language if doc.language in ("zh", "en") else lang
+    doc_archetype = getattr(doc, "archetype", "auto") or "auto"
     try:
         if payload.kind == "full":
             expert_notes = ""
+            must_fix: list[str] = []
             if analysis is not None:
                 from app.content.rubric import expert_label
 
@@ -453,27 +477,30 @@ def rewrite_document(
                     if not adopt or r.expert in adopt
                 ]
                 consensus = json.loads(analysis.consensus_json or "{}")
-                for item in consensus.get("must_fix", []) or []:
-                    lines.append(f"[must-fix] {item}")
+                must_fix = [str(m) for m in (consensus.get("must_fix") or [])]
                 expert_notes = "\n".join(lines)[:4000]
             res = rewrite_mod.rewrite_full(
                 provider, title=doc.title, content=doc.content, platform=doc.platform,
                 lang=out_lang, summary=analysis.summary if analysis else "",
-                expert_notes=expert_notes,
+                expert_notes=expert_notes, must_fix=must_fix,
+                archetype=doc_archetype,
             )
             content, meta = res.rewritten, {
                 "changelog": res.changelog,
                 "diff": res.diff,
                 "adopt": payload.adopt,
+                "audit": res.audit,
             }
         elif payload.kind == "title":
             items = rewrite_mod.title_variants(
-                provider, title=doc.title, content=doc.content, platform=doc.platform, lang=out_lang
+                provider, title=doc.title, content=doc.content, platform=doc.platform,
+                lang=out_lang, archetype=doc_archetype,
             )
             content, meta = json.dumps(items, ensure_ascii=False), {}
         elif payload.kind == "hook":
             items = rewrite_mod.hook_variants(
-                provider, title=doc.title, content=doc.content, platform=doc.platform, lang=out_lang
+                provider, title=doc.title, content=doc.content, platform=doc.platform,
+                lang=out_lang, archetype=doc_archetype,
             )
             content, meta = json.dumps(items, ensure_ascii=False), {}
         else:

@@ -67,6 +67,13 @@ class AdminSettingsIn(BaseModel):
     smtp_use_tls: bool | None = None
     app_base_url: str | None = Field(default=None, max_length=256)
     public_web_url: str | None = Field(default=None, max_length=256)
+    audit_llm_enabled: bool | None = None
+
+
+class AdminRubricWeightsIn(BaseModel):
+    """Per-platform dimension weight overrides (unknown keys are rejected)."""
+
+    weights: dict[str, dict[str, float]]
 
 
 class AdminTestEmailIn(BaseModel):
@@ -91,6 +98,7 @@ class DocumentPasteIn(BaseModel):
     title: str = Field(default="", max_length=300)
     content: str = Field(min_length=1)
     platform: str = Field(default="auto", max_length=24)
+    archetype: str = Field(default="auto", max_length=32)
     consent_improve: bool = True
 
 

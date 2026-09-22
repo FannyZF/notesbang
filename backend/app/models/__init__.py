@@ -199,6 +199,7 @@ class Document(Base):
     title: Mapped[str] = mapped_column(String(300), default="")
     source_format: Mapped[str] = mapped_column(String(16), default="paste")  # docx|txt|md|paste
     platform: Mapped[str] = mapped_column(String(24), default="auto")
+    archetype: Mapped[str] = mapped_column(String(32), default="auto")
     content: Mapped[str] = mapped_column(Text, default="")
     char_count: Mapped[int] = mapped_column(Integer, default=0)
     language: Mapped[str] = mapped_column(String(8), default="")  # detected zh|en|...

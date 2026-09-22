@@ -44,9 +44,15 @@ def test_platforms_list(client):
     r = client.get("/api/documents/platforms?lang=zh", headers=_auth(token))
     assert r.status_code == 200
     data = r.json()
-    keys = {p["key"] for p in data}
+    keys = {p["key"] for p in data["platforms"]}
     assert {"xiaohongshu", "wechat", "linkedin", "x", "blog"} <= keys
-    assert data[0]["dimensions"]  # dimension labels exposed for focus chips
+    assert data["platforms"][0]["dimensions"]  # dimension labels exposed for focus chips
+    assert {a["key"] for a in data["archetypes"]} >= {
+        "auto",
+        "technical_deep_dive",
+        "quick_social_post",
+        "industry_case_study",
+    }
 
 
 def test_create_analyze_scorecard(client):
@@ -54,10 +60,11 @@ def test_create_analyze_scorecard(client):
     doc = _new_doc(client, token)
     assert doc["char_count"] > 0
     assert doc["language"] == "zh"
+    assert doc["archetype"] == "auto"
 
     card = _analyze(client, token, doc["id"])
     assert card["overall_score"] == 50  # mock committee: all bands 3, midpoint 50
-    assert len(card["dimensions"]) == 6
+    assert len(card["dimensions"]) == 7
     assert len(card["experts"]) == 5  # five committee members
     for d in card["dimensions"]:
         assert d["band"] == 3 and d["score"] == 50
@@ -65,6 +72,7 @@ def test_create_analyze_scorecard(client):
         assert d["suggestions"]
         assert len(d["viewpoints"]) == 5  # one viewpoint per expert
         assert "spread" in d
+    assert {d["key"] for d in card["dimensions"]} >= {"domain_logic"}
     assert set(card["consensus"].keys()) >= {"top_priorities", "must_fix"}
 
 

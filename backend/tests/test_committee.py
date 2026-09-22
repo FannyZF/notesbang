@@ -73,13 +73,13 @@ def test_expert_rows_and_aggregates(client):
             .filter(ExpertScore.analysis_id == analysis.id)
             .all()
         )
-        assert len(rows) == 5 * 6  # five experts x six dimensions
+        assert len(rows) == 5 * 7  # five experts x seven dimensions
         dims = (
             db.query(DimensionScore)
             .filter(DimensionScore.analysis_id == analysis.id)
             .all()
         )
-        assert len(dims) == 6
+        assert len(dims) == 7
     finally:
         db.close()
 

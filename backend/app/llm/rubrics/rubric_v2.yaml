@@ -1,0 +1,182 @@
+version: v2
+# v2 adds a 7th scored dimension (domain_logic: facts / terminology / causality)
+# and content archetypes. Scoring still uses ordinal bands 1..5 with an integer
+# score inside the band's range, so the model never invents the final numbers.
+band_scores: {1: 10, 2: 30, 3: 50, 4: 70, 5: 90}
+band_ranges: {1: [0, 20], 2: [21, 40], 3: [41, 60], 4: [61, 80], 5: [81, 100]}
+
+dimensions:
+  - key: hook
+    label: {zh: 首屏钩子穿透力, en: Hook strength}
+    definition:
+      zh: 标题+首屏能否在3秒内制造"必须看下去"的张力
+      en: Whether the title + opening create a "must keep reading" pull within 3 seconds
+    bands:
+      1: {anchor: {zh: 平铺直叙，无悬念/冲突/利益点, en: Flat; no tension, conflict or benefit}, example: {zh: "今天分享一下我的经历。", en: "Today I'll share my experience."}}
+      2: {anchor: {zh: 有信息但无张力，开头可被跳过, en: Informative but skippable}, example: {zh: "最近我读了一本书，觉得很不错。", en: "I recently read a book and liked it."}}
+      3: {anchor: {zh: 有明确钩子之一（利益/反差/悬念/身份代入）, en: One clear hook present}, example: {zh: "我用3个月把粉丝从0做到1万，方法只有3步。", en: "I grew from 0 to 10k followers in 3 months with 3 steps."}}
+      4: {anchor: {zh: 钩子与目标读者痛点高度贴合，前30字即抓人, en: Hook tightly matches the audience's pain within the first line}, example: {zh: "如果你也在为写不出开头发愁，这条能救你。", en: "If your openings never land, this fixes it."}}
+      5: {anchor: {zh: 多重钩子叠加且层层递进，几乎无法跳过, en: Multiple layered hooks; nearly impossible to skip}, example: {zh: "我删掉了90%的开头写法，只留下这1种，阅读量翻了5倍。", en: "I deleted 90% of my openings; the 1 left 5x'd my reads."}}
+  - key: title
+    label: {zh: 标题吸引力, en: Title appeal}
+    definition:
+      zh: 标题是否具体、有信息量且有打开动机
+      en: Whether the title is specific, informative and creates a click motive
+    bands:
+      1: {anchor: {zh: 空泛或纯陈述, en: Vague or purely descriptive}, example: {zh: "我的思考", en: "My thoughts"}}
+      2: {anchor: {zh: 有主题但无动机, en: On-topic but no motive}, example: {zh: "关于内容创作的一些想法", en: "Some thoughts on content"}}
+      3: {anchor: {zh: 具体+利益/好奇之一, en: Specific with one benefit or curiosity}, example: {zh: "3个提升打开率的标题写法", en: "3 title formulas that lift open rates"}}
+      4: {anchor: {zh: 数字/反差/身份代入叠加，直击痛点, en: Numbers/contrast/identity combined}, example: {zh: "写了200篇没人看，改这1处后篇篇过万", en: "200 posts flopped; one fix changed everything"}}
+      5: {anchor: {zh: 极强动机且不夸张、可兑现, en: Strong motive, honest and deliverable}, example: {zh: "从0到10万粉，我只做了这4件事（附模板）", en: "0 to 100k followers with 4 moves (templates included)"}}
+  - key: rhythm
+    label: {zh: 信息推进节奏, en: Information rhythm}
+    definition:
+      zh: 段落长短、信息密度与递进是否利于读完
+      en: Paragraph length, density and progression for finishing the piece
+    bands:
+      1: {anchor: {zh: 大段堆砌、无分段，易弃读, en: Walls of text; easy to abandon}, example: {zh: "（整篇一段话）", en: "(single block of text)"}}
+      2: {anchor: {zh: 有分段但节奏平，无递进, en: Split into paragraphs but flat}, example: {zh: "每段都差不多长、信息量接近。", en: "Every paragraph is the same length."}}
+      3: {anchor: {zh: 长短交替、有基本递进, en: Varied lengths with basic progression}, example: {zh: "短句引出→展开→小结。", en: "Short lead-in, expand, summarize."}}
+      4: {anchor: {zh: 节奏有起伏，关键点有停顿与强调, en: Rhythm with emphasis and pauses at key points}, example: {zh: "关键结论单独成段。", en: "Key conclusions on their own line."}}
+      5: {anchor: {zh: 张弛有度、层层递进、几乎无冗余, en: Tight, layered, almost no filler}, example: {zh: "每段都有新信息，结尾自然收束。", en: "Every paragraph adds something; clean ending."}}
+  - key: emotion
+    label: {zh: 情绪共鸣力, en: Emotional resonance}
+    definition:
+      zh: 是否触发读者的情绪（共鸣/好奇/惊讶/认同）
+      en: Whether it triggers emotion (resonance, curiosity, surprise, agreement)
+    bands:
+      1: {anchor: {zh: 纯信息陈述，无情绪, en: Purely factual}, example: {zh: "以下是操作步骤。", en: "Here are the steps."}}
+      2: {anchor: {zh: 有轻微情绪词但泛泛, en: Mild, generic emotion words}, example: {zh: "我觉得挺重要的。", en: "I think it matters."}}
+      3: {anchor: {zh: 有具体情绪触发点, en: One concrete emotional trigger}, example: {zh: "那种改到凌晨还被否定的感觉，我懂。", en: "I know the 2am rejection feeling."}}
+      4: {anchor: {zh: 情绪与场景绑定，易代入, en: Emotion tied to a vivid scene}, example: {zh: "方案第7次被打回时，我盯着屏幕发呆。", en: "When draft 7 was rejected, I just stared."}}
+      5: {anchor: {zh: 情绪有起伏与释放，读完想转发, en: Emotional arc with release; share-worthy}, example: {zh: "从崩溃到翻盘，只差这一句话。", en: "One sentence between breaking and winning."}}
+  - key: social_currency
+    label: {zh: 社交货币属性, en: Social currency}
+    definition:
+      zh: 读者是否愿意转发/收藏以彰显品味或获得认同
+      en: Whether readers would share/save it to signal taste or gain approval
+    bands:
+      1: {anchor: {zh: 无分享价值, en: No share value}, example: {zh: "日常记录。", en: "A daily log."}}
+      2: {anchor: {zh: 小众有用但不足以分享, en: Niche, not worth sharing}, example: {zh: "个人备忘。", en: "A personal memo."}}
+      3: {anchor: {zh: 有可转述的观点或清单, en: A quotable take or checklist}, example: {zh: "5条可复用的写作清单。", en: "5 reusable writing rules."}}
+      4: {anchor: {zh: 有立场/身份认同，转发即表态, en: A stance readers signal by sharing}, example: {zh: "别再迷信日更了。", en: "Stop worshipping daily posting."}}
+      5: {anchor: {zh: 兼具洞见与身份标签，收藏率极高, en: Insight + identity; high save rate}, example: {zh: "这份清单，同行都在偷偷存。", en: "A checklist peers quietly save."}}
+  - key: interaction
+    label: {zh: 互动触点设计, en: Interaction design}
+    definition:
+      zh: 是否有自然的评论/提问/收藏引导且不生硬
+      en: Natural prompts for comments, questions or saves
+    bands:
+      1: {anchor: {zh: 无任何互动引导, en: No interaction prompts}, example: {zh: "（直接结束）", en: "(ends abruptly)"}}
+      2: {anchor: {zh: 有引导但生硬/无效, en: Prompt present but awkward}, example: {zh: "求点赞求关注。", en: "Please like and follow."}}
+      3: {anchor: {zh: 有具体可回答的问题或行动, en: A concrete question or action}, example: {zh: "你最常用哪一招？评论区告诉我。", en: "Which one do you use? Tell me below."}}
+      4: {anchor: {zh: 互动与内容强相关，易被回答, en: Prompt tied to the content; easy to answer}, example: {zh: "你卡在哪一步？我按评论补下一篇。", en: "Where do you get stuck? I'll cover it next."}}
+      5: {anchor: {zh: 设计成低门槛+高价值的互动钩子, en: Low-effort, high-value interaction hook}, example: {zh: "回复「清单」我把模板发你。", en: "Reply 'list' and I'll send the template."}}
+  - key: domain_logic
+    label: {zh: 事实与逻辑严谨度, en: Factual & logical rigor}
+    definition:
+      zh: 事实/数字/术语是否准确一致，论证与因果是否成立
+      en: Accuracy and consistency of facts, figures and terminology; sound argument and causality
+    bands:
+      1: {anchor: {zh: 存在明显事实错误、自相矛盾或臆造数据, en: Clear factual errors, self-contradiction or fabricated data}, example: {zh: "研究表明90%的人都失败了。", en: "Studies show 90% of people fail."}}
+      2: {anchor: {zh: 有未经验证的绝对化主张，或术语误用, en: Unverified absolute claims, or misused terminology}, example: {zh: "这是唯一有效的写作方法。", en: "This is the only method that works."}}
+      3: {anchor: {zh: 无硬伤；主张可核对、术语基本准确（观点类内容的合理基线）, en: No hard errors; claims checkable and terminology broadly correct (fair baseline for opinion pieces)}, example: {zh: "我把标题从12字改到8字，打开率提升了一倍。", en: "I cut my title from 12 to 8 words and open rates doubled."}}
+      4: {anchor: {zh: 数据与术语精确，因果链清晰无跳跃, en: Precise figures and terminology; clear causal chain with no leaps}, example: {zh: "在500次A/B测试中，短标题的打开率高17%。", en: "Across 500 A/B tests, short titles lifted opens by 17%."}}
+      5: {anchor: {zh: 专业级严谨，来源可追溯、边界表述克制, en: Publication-grade rigor with traceable sources and carefully bounded claims}, example: {zh: "在样本量 n=500、95% 置信区间下，差异显著。", en: "With n=500 and a 95% CI, the difference is significant."}}
+
+platforms:
+  xiaohongshu:
+    label: {zh: 小红书, en: Xiaohongshu}
+    weights: {hook: 0.25, title: 0.18, rhythm: 0.14, emotion: 0.14, social_currency: 0.14, interaction: 0.09, domain_logic: 0.06}
+    norms:
+      zh: 短段、口语化、适度emoji；标题≤20字；标签3–6个；结尾引导收藏/评论
+      en: Short paragraphs, conversational, light emoji; title ≤20 chars; 3–6 tags; end with a save/comment prompt
+    limits: {max_chars: 1000, title_max: 20, tags_min: 3, tags_max: 6}
+  wechat:
+    label: {zh: 公众号, en: WeChat Official Account}
+    weights: {hook: 0.18, title: 0.22, rhythm: 0.18, emotion: 0.14, social_currency: 0.13, interaction: 0.05, domain_logic: 0.1}
+    norms:
+      zh: 标题与首屏决定打开率；长文讲究节奏与金句；结尾给转发理由
+      en: Title/opening drive opens; long-form needs rhythm and quotable lines; give a reason to forward
+    limits: {max_chars: 3000, title_max: 30}
+  linkedin:
+    label: {zh: LinkedIn, en: LinkedIn}
+    weights: {hook: 0.22, title: 0.09, rhythm: 0.18, emotion: 0.13, social_currency: 0.18, interaction: 0.09, domain_logic: 0.11}
+    norms:
+      zh: 专业、故事+洞察；短段；少emoji；结尾提问促评论
+      en: Professional, story + insight; short lines; minimal emoji; end with a question
+    limits: {max_chars: 3000, title_max: 120}
+  x:
+    label: {zh: X (Twitter), en: X (Twitter)}
+    weights: {hook: 0.28, title: 0.05, rhythm: 0.18, emotion: 0.13, social_currency: 0.18, interaction: 0.09, domain_logic: 0.09}
+    norms:
+      zh: 极短、强钩子、可串成长推；一句话一个点
+      en: Very short, strong hook, threadable; one idea per line
+    limits: {max_chars: 2000, title_max: 80}
+  blog:
+    label: {zh: 博客/长文, en: Blog / long-form}
+    weights: {hook: 0.17, title: 0.17, rhythm: 0.17, emotion: 0.09, social_currency: 0.17, interaction: 0.09, domain_logic: 0.14}
+    norms:
+      zh: 结构清晰、小标题、论据充分、SEO友好
+      en: Clear structure, subheadings, evidence, SEO-friendly
+    limits: {max_chars: 3000, title_max: 80}
+  auto:
+    label: {zh: 自动判断, en: Auto-detect}
+    weights: {hook: 0.18, title: 0.18, rhythm: 0.18, emotion: 0.13, social_currency: 0.13, interaction: 0.09, domain_logic: 0.11}
+    norms: {zh: 按内容体裁判断, en: Judge by the content type}
+    limits: {max_chars: 3000, title_max: 80}
+
+# Content archetypes: orthogonal to the platform. "auto" lets the model judge.
+archetypes:
+  auto:
+    label: {zh: 自动判断, en: Auto-detect}
+    norms: {zh: 按内容体裁判断, en: Judge the content type yourself}
+    title: {min: 0, max: 80}
+    formatting: {zh: 遵循所选平台的规范, en: Follow the selected platform's norms}
+  technical_deep_dive:
+    label: {zh: 技术深度长文, en: Technical deep dive}
+    norms: {zh: 结构清晰、论据充分、可复现，术语准确, en: Clear structure, evidence-backed, reproducible, precise terminology}
+    title: {min: 15, max: 35}
+    formatting: {zh: 优先使用列表/表格/编号步骤，信息密度优先于简短, en: Prefer lists, tables or numbered steps; density over brevity}
+  quick_social_post:
+    label: {zh: 轻量社交帖, en: Quick social post}
+    norms: {zh: 强钩子、短段落、可扫读、口语化, en: Strong hook, short paragraphs, scannable, conversational}
+    title: {min: 0, max: 20}
+    formatting: {zh: 1–2 句成段、节奏多变、长度控制在原文±15%, en: 1–2 sentence paragraphs, varied cadence, length within ±15% of the original}
+  industry_case_study:
+    label: {zh: 行业案例复盘, en: Industry case study}
+    norms: {zh: 背景—做法—结果—可复用结论，结果用数据说话, en: Context, actions, results, reusable takeaways; back results with data}
+    title: {min: 15, max: 35}
+    formatting: {zh: 分段小标题，结果部分用数据呈现, en: Subheaded sections; present results with data}
+
+experts:
+  - key: compliance
+    label: {zh: 平台规则合规官, en: Platform Compliance Officer}
+    focus: [interaction]
+    persona:
+      zh: "你负责把关内容是否符合平台规则：敏感/违规表述、绝对化承诺、诱导违规互动。宁可保守，发现即指出。"
+      en: "You enforce platform rules: sensitive or rule-breaking phrasing, absolute claims, prompts for rule-breaking interaction. Be conservative and flag issues."
+  - key: viral
+    label: {zh: 资深爆款打造专家, en: Viral Growth Editor}
+    focus: [hook, title, social_currency]
+    persona:
+      zh: "你擅长制造传播：钩子、标题、社交货币与转发动机。关注“为什么有人愿意点开并转发”。"
+      en: "You craft spread: hooks, titles, social currency and share motives. Ask why someone would click and share."
+  - key: sme
+    label: {zh: 领域专家, en: Subject-Matter Expert}
+    focus: [rhythm, domain_logic]
+    persona:
+      zh: "你是内容所属领域的专家，关注专业准确性与逻辑严谨，禁止臆造数据，术语要恰当。"
+      en: "You are a domain expert: professional accuracy, sound logic, no invented data, correct terminology."
+  - key: audience
+    label: {zh: 读者代言人, en: Audience Advocate}
+    focus: [emotion, interaction]
+    persona:
+      zh: "你代表目标读者：内容是否引起共鸣、易读、贴合读者关切与阅读场景。"
+      en: "You represent the target reader: resonance, readability and fit with their concerns and reading context."
+  - key: structure
+    label: {zh: 结构编辑, en: Structure Editor}
+    focus: [rhythm, title]
+    persona:
+      zh: "你是结构编辑：段落节奏、信息递进、标题与整体框架是否清晰有力。"
+      en: "You edit structure: paragraph rhythm, information progression, title and overall framing."

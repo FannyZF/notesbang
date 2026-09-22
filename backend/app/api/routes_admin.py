@@ -25,7 +25,13 @@ from app.models import (
     PageView,
     User,
 )
-from app.schemas import AdminBanIn, AdminPlanIn, AdminSettingsIn, AdminTestEmailIn
+from app.schemas import (
+    AdminBanIn,
+    AdminPlanIn,
+    AdminRubricWeightsIn,
+    AdminSettingsIn,
+    AdminTestEmailIn,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -180,6 +186,7 @@ def admin_get_settings(request: Request, db: Session = Depends(get_db)):
         "smtp_use_tls": mail["smtp_use_tls"],
         "app_base_url": mail["app_base_url"],
         "public_web_url": mail["public_web_url"],
+        "audit_llm_enabled": runtime.audit_llm_enabled(db),
         "warnings": runtime.mail_warnings(db),
         "overrides": overrides,
         "env": {
@@ -360,6 +367,103 @@ def admin_traffic(
         "top_paths": top_paths,
         "top_referrers": top_referrers,
     }
+
+
+@router.get("/rubric")
+def admin_get_rubric(request: Request, db: Session = Depends(get_db)):
+    """Dimensions, per-platform weights (effective + defaults) and archetypes."""
+    _require_admin(request)
+    from app.content.rubric import effective_weights, load_rubric
+
+    rubric = load_rubric()
+    overrides = runtime.rubric_weight_overrides(db)
+    return {
+        "version": rubric.version,
+        "dimensions": [
+            {"key": d.key, "label_zh": d.label_zh, "label_en": d.label_en}
+            for d in rubric.dimensions
+        ],
+        "platforms": [
+            {
+                "key": p.key,
+                "label_zh": p.label_zh,
+                "label_en": p.label_en,
+                "weights": effective_weights(p.key, overrides.get(p.key)),
+                "default_weights": dict(p.weights),
+                "overridden": bool(overrides.get(p.key)),
+            }
+            for p in rubric.platforms.values()
+        ],
+        "archetypes": [
+            {"key": a.key, "label_zh": a.label_zh, "label_en": a.label_en}
+            for a in rubric.archetypes.values()
+        ],
+        "experts": [
+            {"key": e.key, "label_zh": e.label_zh, "label_en": e.label_en, "focus": e.focus}
+            for e in rubric.experts
+        ],
+    }
+
+
+@router.put("/rubric/weights")
+def admin_set_rubric_weights(
+    payload: AdminRubricWeightsIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Merge per-platform dimension weight overrides (renormalized on use)."""
+    _require_admin(request)
+    from app.content.rubric import load_rubric
+
+    rubric = load_rubric()
+    valid_platforms = set(rubric.platforms)
+    valid_dims = {d.key for d in rubric.dimensions}
+    cleaned: dict[str, dict[str, float]] = {}
+    for platform_key, dims in payload.weights.items():
+        if platform_key not in valid_platforms:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Unknown platform: {platform_key}",
+            )
+        if not isinstance(dims, dict):
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"weights[{platform_key}] must be an object",
+            )
+        for dim_key, value in dims.items():
+            if dim_key not in valid_dims:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Unknown dimension: {dim_key}",
+                )
+            try:
+                num = float(value)
+            except (TypeError, ValueError):
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"weights[{platform_key}][{dim_key}] must be a number",
+                )
+            if num < 0 or num > 1:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"weights[{platform_key}][{dim_key}] must be between 0 and 1",
+                )
+            cleaned.setdefault(platform_key, {})[dim_key] = round(num, 4)
+
+    merged = runtime.rubric_weight_overrides(db)
+    for platform_key, dims in cleaned.items():
+        merged.setdefault(platform_key, {}).update(dims)
+    runtime.set_rubric_weights(db, merged)
+    db.commit()
+    return admin_get_rubric(request, db)
+
+
+@router.post("/rubric/weights/reset")
+def admin_reset_rubric_weights(request: Request, db: Session = Depends(get_db)):
+    _require_admin(request)
+    runtime.clear_rubric_weights(db)
+    db.commit()
+    return admin_get_rubric(request, db)
 
 
 @router.post("/users/{user_id}/plan")
